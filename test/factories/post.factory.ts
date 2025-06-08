@@ -7,15 +7,6 @@ export class PostFactory {
   constructor(private readonly em: EntityManager) {}
 
   async create(data: Partial<Post> & { user?: User } = {}): Promise<Post> {
-    // Use parallel factory in parallel test mode
-    if (process.env.TEST_PARALLEL === 'true') {
-      const { ParallelPostFactory } = await import(
-        '../parallel/factories/post.factory'
-      );
-      const parallelFactory = new ParallelPostFactory(this.em);
-      return parallelFactory.create(data);
-    }
-
     const { user, ...rest } = data;
 
     // Get or create user
@@ -45,15 +36,6 @@ export class PostFactory {
     count: number,
     data: Partial<Post> & { user?: User } = {},
   ): Promise<Post[]> {
-    // Use parallel factory in parallel test mode
-    if (process.env.TEST_PARALLEL === 'true') {
-      const { ParallelPostFactory } = await import(
-        '../parallel/factories/post.factory'
-      );
-      const parallelFactory = new ParallelPostFactory(this.em);
-      return parallelFactory.createMany(count, data);
-    }
-
     const { user, ...rest } = data;
     const posts: Post[] = [];
 

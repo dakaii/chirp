@@ -6,15 +6,6 @@ export class UserFactory {
   constructor(private readonly em: EntityManager) {}
 
   async create(data: Partial<User> = {}): Promise<User> {
-    // Use parallel factory in parallel test mode
-    if (process.env.TEST_PARALLEL === 'true') {
-      const { ParallelUserFactory } = await import(
-        '../parallel/factories/user.factory'
-      );
-      const parallelFactory = new ParallelUserFactory(this.em);
-      return parallelFactory.create(data);
-    }
-
     const user = this.em.create(User, {
       username: `${faker.internet.userName()}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       email: `${Date.now()}_${Math.random().toString(36).substr(2, 9)}@${faker.internet.domainName()}`,
@@ -27,15 +18,6 @@ export class UserFactory {
   }
 
   async createMany(count: number, data: Partial<User> = {}): Promise<User[]> {
-    // Use parallel factory in parallel test mode
-    if (process.env.TEST_PARALLEL === 'true') {
-      const { ParallelUserFactory } = await import(
-        '../parallel/factories/user.factory'
-      );
-      const parallelFactory = new ParallelUserFactory(this.em);
-      return parallelFactory.createMany(count, data);
-    }
-
     const users: User[] = [];
 
     for (let i = 0; i < count; i++) {

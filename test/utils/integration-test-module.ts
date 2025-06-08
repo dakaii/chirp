@@ -11,17 +11,25 @@ import { CommentsService } from '../../src/services/comments.service';
 import { UsersController } from '../../src/controllers/users.controller';
 import { PostsController } from '../../src/controllers/posts.controller';
 import { CommentsController } from '../../src/controllers/comments.controller';
-import { createFactories } from '../factories';
-import { createControllers } from '../controllers';
-import { IntegrationTestContext } from '../types';
-import { cleanDatabase } from './database';
+import mikroOrmConfig from '../mikro-orm.config';
+import { createTestFactories, TestFactories } from './factory-provider';
 
-export { IntegrationTestContext };
+export interface IntegrationTestContext {
+  app: INestApplication;
+  module: TestingModule;
+  orm: MikroORM;
+  // Clean, simple factory interface - no knowledge of parallel vs sequential
+  factories: TestFactories;
+  // Deprecated: Keep for backward compatibility during transition
+  userFactory: TestFactories;
+  postFactory: TestFactories;
+  commentFactory: TestFactories;
+}
 
 export async function createIntegrationTestingModule(): Promise<IntegrationTestContext> {
   const moduleFixture: TestingModule = await Test.createTestingModule({
     imports: [
-      MikroOrmModule.forRoot(),
+      MikroOrmModule.forRoot(mikroOrmConfig),
       MikroOrmModule.forFeature([User, Post, Comment]),
     ],
     controllers: [UsersController, PostsController, CommentsController],
@@ -32,33 +40,38 @@ export async function createIntegrationTestingModule(): Promise<IntegrationTestC
   await app.init();
 
   const orm = moduleFixture.get<MikroORM>(MikroORM);
-  const em = orm.em;
+
+  // Create factories using the clean provider
+  const factories = createTestFactories(orm.em);
 
   return {
     app,
+    module: moduleFixture,
     orm,
-    ...createControllers(moduleFixture),
-    ...createFactories(em),
+    factories,
+    // Backward compatibility - delegate to main factories
+    userFactory: factories,
+    postFactory: factories,
+    commentFactory: factories,
   };
 }
 
 export async function cleanupIntegrationTestingModule(
   context: IntegrationTestContext,
 ): Promise<void> {
-  if (context?.app) {
-    await context.app.close();
-  }
-  if (context?.orm) {
-    await context.orm.close();
-  }
+  await context.app.close();
+  await context.orm.close();
 }
 
-// Simple cleanup for sequential tests (backwards compatibility)
 export async function cleanupDatabase(
   context: IntegrationTestContext,
 ): Promise<void> {
-  // Use the existing cleanDatabase function
-  if (context?.orm?.em) {
-    await cleanDatabase(context.orm.em);
-  }
+  const em = context.orm.em.fork();
+
+  // Clean tables in correct order (handle foreign keys)
+  await em.nativeDelete(Comment, {});
+  await em.nativeDelete(Post, {});
+  await em.nativeDelete(User, {});
+
+  console.log('Cleaning database tables: 3');
 }

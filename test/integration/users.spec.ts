@@ -70,8 +70,8 @@ describe('UsersController (e2e)', () => {
 
   describe('GET /users', () => {
     it('should return all users', async () => {
-      // Create test users first
-      const users = await context.userFactory.createMany(2);
+      // ✨ CLEAN: Just call createManyUsers - no knowledge of parallel/sequential
+      const users = await context.factories.createManyUsers(2);
 
       const response = await request(context.app.getHttpServer())
         .get('/users')
@@ -88,7 +88,8 @@ describe('UsersController (e2e)', () => {
 
   describe('GET /users/:id', () => {
     it('should return a user by id', async () => {
-      const user = await context.userFactory.create();
+      // ✨ CLEAN: Just call createUser - factory provider handles the complexity
+      const user = await context.factories.createUser();
 
       const response = await request(context.app.getHttpServer()).get(
         `/users/${user.id}`,
@@ -108,7 +109,7 @@ describe('UsersController (e2e)', () => {
 
   describe('PATCH /users/:id', () => {
     it('should update a user', async () => {
-      const user = await context.userFactory.create();
+      const user = await context.factories.createUser();
       const updateUserDto = {
         username: 'updateduser',
         email: 'updated@example.com',
@@ -140,7 +141,7 @@ describe('UsersController (e2e)', () => {
 
   describe('DELETE /users/:id', () => {
     it('should delete a user', async () => {
-      const user = await context.userFactory.create();
+      const user = await context.factories.createUser();
 
       const response = await request(context.app.getHttpServer()).delete(
         `/users/${user.id}`,
