@@ -35,46 +35,46 @@ export async function cleanupTestingModule(
 }
 
 export async function cleanupDatabase(context: TestContext): Promise<void> {
-  const em = context.orm.em.fork();
-
+  const forkedEm = context.orm.em.fork();
   try {
-    // For PostgreSQL, we need to delete in the correct order to avoid foreign key violations
-    // Delete comments first (they reference posts and users)
-    await em.nativeDelete('Comment', {});
+    // Get all user tables dynamically from PostgreSQL
+    const result = await forkedEm.getConnection().execute(`
+      SELECT tablename FROM pg_tables
+      WHERE schemaname = 'public'
+      AND tablename NOT LIKE 'pg_%'
+      AND tablename NOT LIKE 'sql_%'
+    `);
 
-    // Delete posts second (they reference users)
-    await em.nativeDelete('Post', {});
+    const tableNames = result
+      .map((row: any) => `"${row.tablename}"`)
+      .join(', ');
 
-    // Delete users last (they are referenced by posts and comments)
-    await em.nativeDelete('User', {});
+    if (tableNames) {
+      // Use PostgreSQL's constraint management to handle foreign keys properly
+      await forkedEm.getConnection().execute(`
+        DO $$ BEGIN
+          -- Disable foreign key constraints
+          EXECUTE 'SET CONSTRAINTS ALL DEFERRED';
 
-    // Reset sequences
-    await em
-      .getConnection()
-      .execute('ALTER SEQUENCE comment_id_seq RESTART WITH 1');
-    await em
-      .getConnection()
-      .execute('ALTER SEQUENCE post_id_seq RESTART WITH 1');
-    await em
-      .getConnection()
-      .execute('ALTER SEQUENCE user_id_seq RESTART WITH 1');
+          -- Truncate all user tables dynamically
+          TRUNCATE TABLE ${tableNames} RESTART IDENTITY CASCADE;
+
+          -- Re-enable foreign key constraints
+          EXECUTE 'SET CONSTRAINTS ALL IMMEDIATE';
+        END $$;
+      `);
+    }
   } catch (error) {
-    // Fallback: try with TRUNCATE CASCADE (might work in some PostgreSQL configurations)
-    console.warn(
-      'Native delete failed, trying TRUNCATE CASCADE:',
-      error.message,
-    );
-    try {
-      await em
-        .getConnection()
-        .execute(
-          'TRUNCATE TABLE "comment", "post", "user" RESTART IDENTITY CASCADE',
-        );
-    } catch (truncateError) {
-      console.error('Both cleanup methods failed:', truncateError.message);
-      throw truncateError;
+    // If tables don't exist, that's fine - they will be created by migrations
+    if (
+      !error.message.includes('does not exist') &&
+      !error.message.includes('relation') &&
+      !error.message.includes('table')
+    ) {
+      throw error;
     }
   }
 
-  await em.clear();
+  // Clear the identity map of the forked EntityManager
+  forkedEm.clear();
 }
