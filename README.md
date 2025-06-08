@@ -218,6 +218,107 @@ docker-compose down -v
 
 <!-- CONTACT -->
 
+## Challenges and Caveats
+
+This project encountered several significant technical challenges during development. Here's a comprehensive overview of the difficulties faced and how they were resolved:
+
+### 1. MikroORM Jest Integration Issues
+
+**Challenge**: The `Map.prototype.set` error in Jest with MikroORM
+
+- **Symptoms**: Tests failing with `TypeError: Map.prototype.set called on incompatible receiver`
+- **Root Cause**: Incompatibility between Jest's `globalSetup`/`globalTeardown` and MikroORM's internal Map usage
+- **Solution**: Removed `globalSetup` from Jest configuration and moved database setup to `setupFilesAfterEnv` using standard `beforeAll()` hooks
+- **Result**: Sequential tests improved from 0/64 to 64/64 passing
+
+### 2. Parallel Testing Architecture
+
+**Challenge**: Implementing reliable parallel test execution
+
+- **Symptoms**: Foreign key constraint violations and entity relationship conflicts
+- **Root Cause**: Each Jest worker gets an isolated database, but factories used hardcoded IDs that don't exist across different worker databases
+- **Approach**: Built comprehensive parallel testing infrastructure with:
+  - Worker-aware database configuration
+  - Isolated factory providers per worker
+  - Clean architectural separation in `test/parallel/` directory
+- **Current Status**:
+  - ✅ Sequential tests: 64/64 passing
+  - 🔶 Parallel tests: Partially working but still encountering foreign key issues
+
+### 3. Database Test Isolation
+
+**Challenge**: Ensuring clean database state between tests
+
+- **Initial Approach**: Transaction-based isolation with rollbacks
+- **Problems**: Complex nested transaction management and potential deadlocks
+- **Final Solution**: Database cleanup using dynamic table discovery
+  - Query PostgreSQL metadata to get all user tables automatically
+  - Disable foreign key constraints during cleanup
+  - Re-enable constraints after cleanup
+- **Benefits**: Maintainable, reliable, and automatically adapts to schema changes
+
+### 4. Entity Factory Complexity
+
+**Challenge**: Managing test data creation across different test environments
+
+- **Evolution**:
+  1. Started with hardcoded seeding
+  2. Moved to complex factory hierarchies
+  3. Implemented Factory Provider pattern for clean separation
+- **Final Architecture**:
+  - Simple factories focused only on entity creation
+  - Centralized logic in `factory-provider.ts` for environment-aware behavior
+  - Tests use clean `context.factories.createUser()` API without knowing about parallel/sequential modes
+
+### 5. MikroORM Global Context Issues
+
+**Challenge**: `RequestContext` and global context conflicts in tests
+
+- **Solution**: Set `allowGlobalContext: true` for test environments
+- **Configuration**: Environment-aware context handling in MikroORM config
+
+### 6. Test Performance and Reliability
+
+**Challenge**: Balancing test speed with reliability
+
+- **Considerations**:
+  - Sequential tests: Slower but 100% reliable
+  - Parallel tests: Faster but complex database isolation requirements
+- **Approach**: Dual configuration supporting both modes:
+
+  ```bash
+  # Sequential (reliable)
+  npm run test
+
+  # Parallel (experimental)
+  npm run test:parallel
+  ```
+
+### 7. Database Migration Management
+
+**Challenge**: Ensuring consistent schema across environments
+
+- **Solution**: Comprehensive migration strategy with:
+  - Transactional migrations
+  - All-or-nothing approach
+  - Separate test database initialization
+  - Environment-aware entity path resolution
+
+### Key Lessons Learned
+
+1. **Jest + ORM Integration**: Always use `setupFilesAfterEnv` instead of `globalSetup` for database ORMs
+2. **Test Isolation**: Database cleanup is more reliable than transaction rollbacks for integration tests
+3. **Parallel Testing**: Requires careful architecture and may not always be worth the complexity
+4. **Factory Patterns**: Clean separation between data creation and environment logic reduces complexity
+5. **Progressive Enhancement**: Build sequential tests first, then add parallel testing as an optional feature
+
+### Architecture Decisions
+
+- **Clean Separation**: All parallel-specific code isolated in `test/parallel/`
+- **Backward Compatibility**: Main test suite remains simple and reliable
+- **Environment Detection**: Smart configuration based on `NODE_ENV` and `JEST_WORKER_ID`
+- **Documentation First**: Comprehensive documentation for complex testing infrastructure
+
 ## Contact
 
 Daiki Nakashita - [@LinkedIn](https://www.linkedin.com/in/daikinakashita/)
