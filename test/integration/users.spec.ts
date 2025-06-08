@@ -1,8 +1,8 @@
 import * as request from 'supertest';
 import {
   IntegrationTestContext,
-  createIntegrationTestModule,
-  cleanupIntegrationTestModule,
+  createIntegrationTestingModule,
+  cleanupIntegrationTestingModule,
   cleanupDatabase,
 } from '../utils/integration-test-module';
 
@@ -10,7 +10,7 @@ describe('UsersController (e2e)', () => {
   let context: IntegrationTestContext;
 
   beforeAll(async () => {
-    context = await createIntegrationTestModule();
+    context = await createIntegrationTestingModule();
   });
 
   beforeEach(async () => {
@@ -18,7 +18,7 @@ describe('UsersController (e2e)', () => {
   });
 
   afterAll(async () => {
-    await cleanupIntegrationTestModule(context);
+    await cleanupIntegrationTestingModule(context);
   });
 
   describe('POST /users', () => {

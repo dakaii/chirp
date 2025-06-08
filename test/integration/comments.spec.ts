@@ -3,8 +3,8 @@ import { User } from '../../src/entities/user.entity';
 import { Post } from '../../src/entities/post.entity';
 import {
   IntegrationTestContext,
-  createIntegrationTestModule,
-  cleanupIntegrationTestModule,
+  createIntegrationTestingModule,
+  cleanupIntegrationTestingModule,
   cleanupDatabase,
 } from '../utils/integration-test-module';
 
@@ -14,7 +14,7 @@ describe('CommentsController (e2e)', () => {
   let testPost: Post;
 
   beforeAll(async () => {
-    context = await createIntegrationTestModule();
+    context = await createIntegrationTestingModule();
   });
 
   beforeEach(async () => {
@@ -24,7 +24,7 @@ describe('CommentsController (e2e)', () => {
   });
 
   afterAll(async () => {
-    await cleanupIntegrationTestModule(context);
+    await cleanupIntegrationTestingModule(context);
   });
 
   describe('POST /comments', () => {

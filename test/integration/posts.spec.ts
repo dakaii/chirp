@@ -2,8 +2,8 @@ import * as request from 'supertest';
 import { User } from '../../src/entities/user.entity';
 import {
   IntegrationTestContext,
-  createIntegrationTestModule,
-  cleanupIntegrationTestModule,
+  createIntegrationTestingModule,
+  cleanupIntegrationTestingModule,
   cleanupDatabase,
 } from '../utils/integration-test-module';
 
@@ -12,7 +12,7 @@ describe('PostsController (e2e)', () => {
   let testUser: User;
 
   beforeAll(async () => {
-    context = await createIntegrationTestModule();
+    context = await createIntegrationTestingModule();
   });
 
   beforeEach(async () => {
@@ -21,7 +21,7 @@ describe('PostsController (e2e)', () => {
   });
 
   afterAll(async () => {
-    await cleanupIntegrationTestModule(context);
+    await cleanupIntegrationTestingModule(context);
   });
 
   describe('POST /posts', () => {
