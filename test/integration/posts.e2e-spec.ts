@@ -38,8 +38,10 @@ describe('PostsController (e2e)', () => {
   beforeEach(async () => {
     // Clear all data before each test
     const em = orm.em.fork();
-    await em.nativeDelete(Post, {});
-    await em.nativeDelete(User, {});
+    await em.getConnection().execute(`
+      TRUNCATE TABLE "comment", "post", "user" RESTART IDENTITY CASCADE;
+    `);
+    await em.clear();
 
     // Create a test user for each test
     testUser = await userFactory.create();

@@ -30,15 +30,17 @@ describe('UsersController', () => {
     em = module.get<EntityManager>(EntityManager);
 
     // Clear all data before each test
-    await em.nativeDelete(User, {});
-    await em.flush();
+    await em.getConnection().execute(`
+      TRUNCATE TABLE "comment", "post", "user" RESTART IDENTITY CASCADE;
+    `);
     await em.clear();
   });
 
   afterEach(async () => {
     // Clear all data after each test
-    await em.nativeDelete(User, {});
-    await em.flush();
+    await em.getConnection().execute(`
+      TRUNCATE TABLE "comment", "post", "user" RESTART IDENTITY CASCADE;
+    `);
     await em.clear();
   });
 
@@ -68,9 +70,16 @@ describe('UsersController', () => {
         password: 'password123',
       };
 
+      // First creation should succeed
       await controller.create(createUserDto);
 
-      await expect(controller.create(createUserDto)).rejects.toThrow(
+      // Second creation with same email should fail
+      await expect(
+        controller.create({
+          ...createUserDto,
+          username: 'differentuser', // Different username but same email
+        }),
+      ).rejects.toThrow(
         new HttpException(
           'Username or email already exists',
           HttpStatus.CONFLICT,
@@ -81,7 +90,19 @@ describe('UsersController', () => {
 
   describe('findAll', () => {
     it('should return an array of users', async () => {
-      const users = await userFactory.createMany(3);
+      // Clear any existing users
+      await em.getConnection().execute(`
+        TRUNCATE TABLE "comment", "post", "user" RESTART IDENTITY CASCADE;
+      `);
+      await em.clear();
+
+      // Create exactly 3 users
+      const users = await Promise.all([
+        userFactory.create(),
+        userFactory.create(),
+        userFactory.create(),
+      ]);
+
       const result = await controller.findAll();
 
       expect(result).toHaveLength(users.length);

@@ -42,9 +42,10 @@ describe('CommentsController (e2e)', () => {
   beforeEach(async () => {
     // Clear all data before each test
     const em = orm.em.fork();
-    await em.nativeDelete(Comment, {});
-    await em.nativeDelete(Post, {});
-    await em.nativeDelete(User, {});
+    await em.getConnection().execute(`
+      TRUNCATE TABLE "comment", "post", "user" RESTART IDENTITY CASCADE;
+    `);
+    await em.clear();
 
     // Create test user and post for each test
     testUser = await userFactory.create();

@@ -39,9 +39,9 @@ describe('PostsController', () => {
   });
 
   afterEach(async () => {
-    await em.nativeDelete(Post, {});
-    await em.nativeDelete(User, {});
-    await em.flush();
+    await em.getConnection().execute(`
+      TRUNCATE TABLE "comment", "post", "user" RESTART IDENTITY CASCADE;
+    `);
     await em.clear();
   });
 
@@ -51,6 +51,9 @@ describe('PostsController', () => {
 
   describe('create', () => {
     it('should create a new post', async () => {
+      // Create a test user first
+      const testUser = await userFactory.create();
+
       const createPostDto = {
         title: 'Test Post',
         content: 'Test Content',
@@ -79,7 +82,18 @@ describe('PostsController', () => {
 
   describe('findAll', () => {
     it('should return an array of posts', async () => {
+      // Clear any existing data
+      await em.getConnection().execute(`
+        TRUNCATE TABLE "comment", "post", "user" RESTART IDENTITY CASCADE;
+      `);
+      await em.clear();
+
+      // Create a test user first
+      const testUser = await userFactory.create();
+
+      // Then create posts for that user
       const posts = await postFactory.createMany(3, { user: testUser });
+
       const result = await controller.findAll();
 
       expect(result).toHaveLength(posts.length);
