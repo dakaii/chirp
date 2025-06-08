@@ -18,21 +18,21 @@ describe('UsersController', () => {
   });
 
   it('should be defined', async () => {
-    await withTestTransaction(context, async (testContext) => {
-      expect(testContext.usersController).toBeDefined();
+    await withTestTransaction(context, async () => {
+      expect(context.usersController).toBeDefined();
     });
   });
 
   describe('create', () => {
     it('should create a new user', async () => {
-      await withTestTransaction(context, async (testContext) => {
+      await withTestTransaction(context, async () => {
         const createUserDto = {
           username: 'testuser',
           email: 'test@example.com',
           password: 'password123',
         };
 
-        const result = await testContext.usersController.create(createUserDto);
+        const result = await context.usersController.create(createUserDto);
 
         expect(result).toHaveProperty('id');
         expect(result.username).toBe('testuser');
@@ -42,7 +42,7 @@ describe('UsersController', () => {
     });
 
     it('should throw conflict exception for duplicate email', async () => {
-      await withTestTransaction(context, async (testContext) => {
+      await withTestTransaction(context, async () => {
         const createUserDto = {
           username: 'testuser',
           email: 'duplicate@example.com',
@@ -50,7 +50,7 @@ describe('UsersController', () => {
         };
 
         // Create first user
-        await testContext.usersController.create(createUserDto);
+        await context.usersController.create(createUserDto);
 
         // Try to create second user with same email
         const duplicateDto = {
@@ -60,7 +60,7 @@ describe('UsersController', () => {
         };
 
         await expect(
-          testContext.usersController.create(duplicateDto),
+          context.usersController.create(duplicateDto),
         ).rejects.toThrow();
       });
     });
@@ -68,11 +68,11 @@ describe('UsersController', () => {
 
   describe('findAll', () => {
     it('should return an array of users', async () => {
-      await withTestTransaction(context, async (testContext) => {
+      await withTestTransaction(context, async () => {
         // Create test users
-        await testContext.userFactory.createMany(3);
+        await context.userFactory.createMany(3);
 
-        const result = await testContext.usersController.findAll();
+        const result = await context.usersController.findAll();
 
         expect(Array.isArray(result)).toBe(true);
         expect(result.length).toBe(3);
@@ -86,10 +86,12 @@ describe('UsersController', () => {
 
   describe('findOne', () => {
     it('should return a user by id', async () => {
-      await withTestTransaction(context, async (testContext) => {
-        const user = await testContext.userFactory.create();
+      await withTestTransaction(context, async () => {
+        const user = await context.userFactory.create();
 
-        const result = await testContext.usersController.findOne(user.id);
+        const result = await context.usersController.findOne(
+          user.id.toString(),
+        );
 
         expect(result).toHaveProperty('id', user.id);
         expect(result).toHaveProperty('username', user.username);
@@ -99,8 +101,8 @@ describe('UsersController', () => {
     });
 
     it('should return null for non-existent user', async () => {
-      await withTestTransaction(context, async (testContext) => {
-        const result = await testContext.usersController.findOne(999);
+      await withTestTransaction(context, async () => {
+        const result = await context.usersController.findOne('999');
         expect(result).toBeNull();
       });
     });
@@ -108,15 +110,15 @@ describe('UsersController', () => {
 
   describe('update', () => {
     it('should update a user', async () => {
-      await withTestTransaction(context, async (testContext) => {
-        const user = await testContext.userFactory.create();
+      await withTestTransaction(context, async () => {
+        const user = await context.userFactory.create();
         const updateUserDto = {
           username: 'updateduser',
           email: 'updated@example.com',
         };
 
-        const result = await testContext.usersController.update(
-          user.id,
+        const result = await context.usersController.update(
+          user.id.toString(),
           updateUserDto,
         );
 
@@ -128,14 +130,14 @@ describe('UsersController', () => {
     });
 
     it('should return null for non-existent user', async () => {
-      await withTestTransaction(context, async (testContext) => {
+      await withTestTransaction(context, async () => {
         const updateUserDto = {
           username: 'updateduser',
           email: 'updated@example.com',
         };
 
-        const result = await testContext.usersController.update(
-          999,
+        const result = await context.usersController.update(
+          '999',
           updateUserDto,
         );
         expect(result).toBeNull();
@@ -145,20 +147,22 @@ describe('UsersController', () => {
 
   describe('remove', () => {
     it('should delete a user', async () => {
-      await withTestTransaction(context, async (testContext) => {
-        const user = await testContext.userFactory.create();
+      await withTestTransaction(context, async () => {
+        const user = await context.userFactory.create();
 
-        const result = await testContext.usersController.remove(user.id);
+        const result = await context.usersController.remove(user.id.toString());
         expect(result).toBe(true);
 
-        const deletedUser = await testContext.usersController.findOne(user.id);
+        const deletedUser = await context.usersController.findOne(
+          user.id.toString(),
+        );
         expect(deletedUser).toBeNull();
       });
     });
 
     it('should return false for non-existent user', async () => {
-      await withTestTransaction(context, async (testContext) => {
-        const result = await testContext.usersController.remove(999);
+      await withTestTransaction(context, async () => {
+        const result = await context.usersController.remove('999');
         expect(result).toBe(false);
       });
     });

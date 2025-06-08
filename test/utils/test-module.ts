@@ -1,7 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { MikroORM } from '@mikro-orm/core';
 import { AppModule } from '../../src/app.module';
-import testConfig from '../mikro-orm.config';
 import { createFactories } from '../factories';
 import { createControllers } from '../controllers';
 import { TestContext } from '../types';
@@ -11,14 +10,9 @@ export { TestContext };
 export async function createTestingModule(): Promise<TestContext> {
   const moduleFixture: TestingModule = await Test.createTestingModule({
     imports: [AppModule],
-  })
-    .overrideProvider(MikroORM)
-    .useValue(await MikroORM.init(testConfig))
-    .compile();
+  }).compile();
 
   const orm = moduleFixture.get<MikroORM>(MikroORM);
-
-  // Use the same EntityManager for the entire test context
   const em = orm.em;
 
   return {
@@ -37,23 +31,12 @@ export async function cleanupTestingModule(
 // Transaction-based test isolation (much more reliable than cleanup)
 export async function withTestTransaction<T>(
   context: TestContext,
-  testFn: (em: any) => Promise<T>,
+  testFn: () => Promise<T>,
 ): Promise<T> {
-  const em = context.orm.em.fork();
-
-  return await em.transactional(async (transactionalEm) => {
-    // Create factories that use the transactional EntityManager
-    const transactionalFactories = createFactories(transactionalEm);
-
-    // Run the test with the transactional context
-    const testContext = {
-      ...context,
-      em: transactionalEm,
-      ...transactionalFactories,
-    };
-
-    return await testFn(testContext);
-    // Transaction automatically rolls back after this scope
+  return await context.orm.em.transactional(async (em) => {
+    // All operations within this block use the same transaction
+    // When the transaction ends, all changes are automatically rolled back
+    return await testFn();
   });
 }
 

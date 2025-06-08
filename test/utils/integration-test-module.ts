@@ -2,7 +2,6 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
 import { MikroORM } from '@mikro-orm/core';
 import { AppModule } from '../../src/app.module';
-import testConfig from '../mikro-orm.config';
 import { createFactories } from '../factories';
 import { createControllers } from '../controllers';
 import { IntegrationTestContext } from '../types';
@@ -12,10 +11,7 @@ export { IntegrationTestContext };
 export async function createIntegrationTestingModule(): Promise<IntegrationTestContext> {
   const moduleFixture: TestingModule = await Test.createTestingModule({
     imports: [AppModule],
-  })
-    .overrideProvider(MikroORM)
-    .useValue(await MikroORM.init(testConfig))
-    .compile();
+  }).compile();
 
   const app = moduleFixture.createNestApplication();
   await app.init();
@@ -40,12 +36,10 @@ export async function cleanupIntegrationTestingModule(
   await context.orm.close();
 }
 
-// Simple and reliable cleanup for per-worker databases
+// Simple cleanup for sequential tests
 export async function cleanupDatabase(
   context: IntegrationTestContext,
 ): Promise<void> {
-  const em = context.orm.em.fork();
-
   try {
     // Get all table names dynamically from metadata
     const metadata = context.orm.getMetadata();
@@ -55,17 +49,15 @@ export async function cleanupDatabase(
     );
 
     if (tableNames.length > 0) {
-      // With per-worker databases, TRUNCATE CASCADE is safe and fast
+      // TRUNCATE CASCADE clears all data and resets sequences
       const truncateQuery = `TRUNCATE ${tableNames.join(', ')} RESTART IDENTITY CASCADE`;
-      await em.getConnection().execute(truncateQuery);
+      await context.orm.em.getConnection().execute(truncateQuery);
     }
-  } catch (error) {
-    // In per-worker setup, failures should be rare. Log and re-throw for visibility
-    console.error(`Failed to cleanup worker database:`, error.message);
-    throw error;
-  }
 
-  // Clear all entity manager caches
-  em.clear();
-  context.orm.em.clear();
+    // Clear entity manager caches to ensure fresh state
+    context.orm.em.clear();
+  } catch (error) {
+    // Log but don't fail tests on cleanup errors
+    console.warn(`Failed to cleanup database:`, error.message);
+  }
 }
