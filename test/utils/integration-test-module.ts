@@ -18,13 +18,7 @@ export interface IntegrationTestContext {
   app: INestApplication;
   module: TestingModule;
   orm: MikroORM;
-  // ✅ Clean: Data provider handles entity provision from outside
   data: TestDataProvider;
-  // Deprecated: For backward compatibility during transition
-  factories?: any;
-  userFactory?: any;
-  postFactory?: any;
-  commentFactory?: any;
 }
 
 /**
@@ -84,11 +78,6 @@ export async function createIntegrationTestingModule(): Promise<IntegrationTestC
     module: moduleFixture,
     orm,
     data,
-    // Backward compatibility - correctly expose individual factories
-    factories: data,
-    userFactory: data.userFactory,
-    postFactory: data.postFactory,
-    commentFactory: data.commentFactory,
   };
 }
 
@@ -110,5 +99,5 @@ export async function cleanupDatabase(
   // Only delete users that are NOT seeded (preserve IDs 1, 2, 3)
   await em.nativeDelete(User, { id: { $gt: 3 } });
 
-  console.log('Cleaning database tables: 3');
+  console.log('Cleaning database tables (preserving seeded users)');
 }
