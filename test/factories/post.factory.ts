@@ -6,25 +6,14 @@ import { faker } from '@faker-js/faker';
 export class PostFactory {
   constructor(private readonly em: EntityManager) {}
 
-  async create(data: Partial<Post> & { user?: User } = {}): Promise<Post> {
+  async create(data: Partial<Post> & { user: User }): Promise<Post> {
     const { user, ...rest } = data;
-
-    // Get or create user
-    let targetUser = user;
-    if (!targetUser) {
-      targetUser = this.em.create(User, {
-        username: `${faker.internet.userName()}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        email: `${Date.now()}_${Math.random().toString(36).substr(2, 9)}@${faker.internet.domainName()}`,
-        password: faker.internet.password(),
-      });
-      await this.em.persistAndFlush(targetUser);
-    }
 
     const post = this.em.create(Post, {
       title: faker.lorem.sentence(),
       content: faker.lorem.paragraphs(3),
       createdAt: new Date(),
-      user: targetUser,
+      user,
       ...rest,
     });
 
@@ -34,28 +23,17 @@ export class PostFactory {
 
   async createMany(
     count: number,
-    data: Partial<Post> & { user?: User } = {},
+    data: Partial<Post> & { user: User },
   ): Promise<Post[]> {
     const { user, ...rest } = data;
+
     const posts: Post[] = [];
-
-    // Create a user for all posts if none provided
-    let targetUser = user;
-    if (!targetUser) {
-      targetUser = this.em.create(User, {
-        username: `${faker.internet.userName()}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        email: `${Date.now()}_${Math.random().toString(36).substr(2, 9)}@${faker.internet.domainName()}`,
-        password: faker.internet.password(),
-      });
-      await this.em.persistAndFlush(targetUser);
-    }
-
     for (let i = 0; i < count; i++) {
       const post = this.em.create(Post, {
         title: `${faker.lorem.sentence()} ${i}`,
         content: faker.lorem.paragraphs(2),
         createdAt: new Date(),
-        user: targetUser,
+        user,
         ...rest,
       });
       posts.push(post);

@@ -2,68 +2,106 @@
  * Main Test Setup (runs before each test file)
  *
  * This file runs before each test file is executed.
- * It provides the basic setup that works for all tests.
- *
- * For parallel testing, see test/parallel/ directory.
+ * It conditionally loads parallel or sequential setup based on TEST_PARALLEL environment variable.
  */
 
 import { MikroORM } from '@mikro-orm/core';
+import { User } from '../src/entities/user.entity';
 import mikroOrmConfig from './mikro-orm.config';
 
 // Increase timeout for database operations
 jest.setTimeout(30000);
 
-// Simple database setup function for main tests
-async function setupDatabase() {
-  console.log('🚀 Setting up test database...');
+// Conditionally load parallel setup if TEST_PARALLEL is enabled
+if (process.env.TEST_PARALLEL === 'true') {
+  // Import and use parallel setup for worker databases
+  const { setupParallelDatabase } = require('./parallel/parallel-setup');
 
-  try {
-    // Connect to the default test database
-    const testOrmConfig = {
-      ...mikroOrmConfig,
-      dbName: process.env.TEST_DB_NAME || 'chirp_test',
-    };
+  // Setup once before all tests in this worker
+  let parallelSetupComplete = false;
 
-    const testOrm = await MikroORM.init(testOrmConfig);
+  beforeAll(async () => {
+    if (!parallelSetupComplete) {
+      await setupParallelDatabase();
+      parallelSetupComplete = true;
+    }
+  });
+} else {
+  // Use sequential setup for regular testing
 
-    console.log('🗃️ Initializing database schema...');
+  /**
+   * Simple database setup function for sequential tests
+   */
+  async function setupSequentialDatabase() {
+    console.log('🚀 Setting up sequential test database...');
 
-    // Generate schema
-    const generator = testOrm.getSchemaGenerator();
-    await generator.dropSchema();
-    await generator.createSchema();
+    try {
+      // Connect to the default test database
+      const testOrmConfig = {
+        ...mikroOrmConfig,
+        dbName: process.env.TEST_DB_NAME || 'chirp_test',
+      };
 
-    console.log('✅ Database schema initialized');
+      const testOrm = await MikroORM.init(testOrmConfig);
 
-    await testOrm.close();
+      console.log('🗃️ Initializing database schema...');
 
-    console.log('✅ Database setup completed');
-  } catch (error) {
-    console.error('❌ Database setup failed:', error);
-    throw error;
+      // Generate schema
+      const generator = testOrm.getSchemaGenerator();
+      await generator.dropSchema();
+      await generator.createSchema();
+
+      // 🎯 SEED BASIC ENTITIES - This solves foreign key issues!
+      await seedBasicEntities(testOrm);
+
+      console.log('✅ Database schema initialized');
+
+      await testOrm.close();
+
+      console.log('✅ Sequential database setup completed');
+    } catch (error) {
+      console.error('❌ Sequential database setup failed:', error);
+      throw error;
+    }
   }
+
+  /**
+   * Seed database with basic entities that factories can reference
+   * This solves foreign key constraint violations without complicating factories
+   */
+  async function seedBasicEntities(orm: MikroORM) {
+    const em = orm.em;
+
+    console.log('🌱 Seeding basic entities...');
+
+    // Create basic users that will always exist (IDs 1, 2, 3)
+    const users: User[] = [];
+    for (let i = 1; i <= 3; i++) {
+      const user = em.create(User, {
+        id: i,
+        username: `test_user_${i}`,
+        email: `test_user_${i}@example.com`,
+        password: 'password123',
+      });
+      users.push(user);
+    }
+
+    await em.persistAndFlush(users);
+    console.log(`✅ Seeded ${users.length} basic users`);
+  }
+
+  // Setup once before all tests
+  let setupComplete = false;
+
+  beforeAll(async () => {
+    if (!setupComplete) {
+      await setupSequentialDatabase();
+      setupComplete = true;
+    }
+  });
 }
 
-// Check if we're in parallel mode and use appropriate setup
-let setupComplete = false;
-
-beforeAll(async () => {
-  if (!setupComplete) {
-    if (process.env.TEST_PARALLEL === 'true') {
-      // Use parallel setup
-      const { setupParallelDatabase } = await import(
-        './parallel/parallel-setup'
-      );
-      await setupParallelDatabase();
-    } else {
-      // Use simple sequential setup
-      await setupDatabase();
-    }
-    setupComplete = true;
-  }
-});
-
-// Global error handler for unhandled promise rejections
+// Global error handlers (apply to both parallel and sequential tests)
 process.on('unhandledRejection', (reason, promise) => {
   console.error('Unhandled promise rejection:', reason);
 });

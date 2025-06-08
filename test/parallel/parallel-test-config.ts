@@ -1,8 +1,8 @@
 /**
- * Test Configuration Utilities
+ * Parallel Test Configuration Utilities
  *
- * This module provides utilities for configuring tests in a way that facilitates
- * parallel testing. Each test worker can have its own isolated environment.
+ * This module provides utilities for configuring parallel tests.
+ * Each test worker can have its own isolated environment.
  */
 
 interface TestWorkerConfig {

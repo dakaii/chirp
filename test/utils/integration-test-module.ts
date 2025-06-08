@@ -12,18 +12,50 @@ import { UsersController } from '../../src/controllers/users.controller';
 import { PostsController } from '../../src/controllers/posts.controller';
 import { CommentsController } from '../../src/controllers/comments.controller';
 import mikroOrmConfig from '../mikro-orm.config';
-import { createTestFactories, TestFactories } from './factory-provider';
+import { createTestDataProvider, TestDataProvider } from './test-data-provider';
 
 export interface IntegrationTestContext {
   app: INestApplication;
   module: TestingModule;
   orm: MikroORM;
-  // Clean, simple factory interface - no knowledge of parallel vs sequential
-  factories: TestFactories;
-  // Deprecated: Keep for backward compatibility during transition
-  userFactory: TestFactories;
-  postFactory: TestFactories;
-  commentFactory: TestFactories;
+  // ✅ Clean: Data provider handles entity provision from outside
+  data: TestDataProvider;
+  // Deprecated: For backward compatibility during transition
+  factories?: any;
+  userFactory?: any;
+  postFactory?: any;
+  commentFactory?: any;
+}
+
+/**
+ * Ensure seeded users exist in the database for tests to reference
+ */
+async function ensureSeededUsers(orm: MikroORM): Promise<void> {
+  const em = orm.em.fork();
+
+  // Check if seeded users already exist
+  const existingUsers = await em.find(User, { id: { $in: [1, 2, 3] } });
+
+  if (existingUsers.length < 3) {
+    console.log('🌱 Creating seeded users for integration tests...');
+
+    // Create/update seeded users
+    for (let i = 1; i <= 3; i++) {
+      let user = await em.findOne(User, { id: i });
+
+      if (!user) {
+        user = em.create(User, {
+          id: i,
+          username: `test_user_${i}`,
+          email: `test_user_${i}@example.com`,
+          password: 'password123',
+        });
+      }
+    }
+
+    await em.flush();
+    console.log('✅ Seeded users ready for integration tests');
+  }
 }
 
 export async function createIntegrationTestingModule(): Promise<IntegrationTestContext> {
@@ -41,18 +73,22 @@ export async function createIntegrationTestingModule(): Promise<IntegrationTestC
 
   const orm = moduleFixture.get<MikroORM>(MikroORM);
 
-  // Create factories using the clean provider
-  const factories = createTestFactories(orm.em);
+  // Ensure seeded users exist for this test context
+  await ensureSeededUsers(orm);
+
+  // Create data provider that handles entity provision from outside
+  const data = createTestDataProvider(orm.em);
 
   return {
     app,
     module: moduleFixture,
     orm,
-    factories,
-    // Backward compatibility - delegate to main factories
-    userFactory: factories,
-    postFactory: factories,
-    commentFactory: factories,
+    data,
+    // Backward compatibility - correctly expose individual factories
+    factories: data,
+    userFactory: data.userFactory,
+    postFactory: data.postFactory,
+    commentFactory: data.commentFactory,
   };
 }
 
@@ -71,7 +107,8 @@ export async function cleanupDatabase(
   // Clean tables in correct order (handle foreign keys)
   await em.nativeDelete(Comment, {});
   await em.nativeDelete(Post, {});
-  await em.nativeDelete(User, {});
+  // Only delete users that are NOT seeded (preserve IDs 1, 2, 3)
+  await em.nativeDelete(User, { id: { $gt: 3 } });
 
   console.log('Cleaning database tables: 3');
 }

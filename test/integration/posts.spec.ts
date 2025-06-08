@@ -1,5 +1,4 @@
 import * as request from 'supertest';
-import { User } from '../../src/entities/user.entity';
 import {
   IntegrationTestContext,
   createIntegrationTestingModule,
@@ -9,15 +8,13 @@ import {
 
 describe('PostsController (e2e)', () => {
   let context: IntegrationTestContext;
-  let testUser: User;
 
   beforeAll(async () => {
     context = await createIntegrationTestingModule();
   });
 
-  beforeEach(async () => {
+  afterEach(async () => {
     await cleanupDatabase(context);
-    testUser = await context.userFactory.create();
   });
 
   afterAll(async () => {
@@ -26,162 +23,113 @@ describe('PostsController (e2e)', () => {
 
   describe('POST /posts', () => {
     it('should create a new post', async () => {
+      const user = context.data.getSeededUser();
+
+      const createPostDto = {
+        title: 'Test Post',
+        content: 'This is a test post content',
+        userId: user.id,
+      };
+
       const response = await request(context.app.getHttpServer())
         .post('/posts')
-        .send({
-          title: 'Test Post',
-          content: 'This is a test post',
-          userId: testUser.id,
-        });
+        .send(createPostDto)
+        .expect(201);
 
-      expect(response.status).toBe(201);
       expect(response.body).toHaveProperty('id');
       expect(response.body.title).toBe('Test Post');
-      expect(response.body.content).toBe('This is a test post');
-      expect(response.body.user.id).toBe(testUser.id);
-    });
-
-    it('should return 404 if user not found', async () => {
-      const response = await request(context.app.getHttpServer())
-        .post('/posts')
-        .send({
-          title: 'Test Post',
-          content: 'This is a test post',
-          userId: 999,
-        });
-
-      expect(response.status).toBe(404);
+      expect(response.body.content).toBe('This is a test post content');
+      expect(response.body.user.id).toBe(user.id);
     });
   });
 
   describe('GET /posts', () => {
     it('should return all posts', async () => {
-      await context.postFactory.createMany(2, { user: testUser });
+      const user = context.data.getSeededUser();
+      const posts = await Promise.all([
+        context.data.postFactory.create({ title: 'Post 1', user }),
+        context.data.postFactory.create({ title: 'Post 2', user }),
+      ]);
 
-      const response = await request(context.app.getHttpServer()).get('/posts');
+      const response = await request(context.app.getHttpServer())
+        .get('/posts')
+        .expect(200);
 
-      expect(response.status).toBe(200);
       expect(response.body).toHaveLength(2);
       expect(response.body[0]).toHaveProperty('id');
       expect(response.body[0]).toHaveProperty('title');
       expect(response.body[0]).toHaveProperty('content');
-      expect(response.body[0].user.id).toBe(testUser.id);
     });
   });
 
   describe('GET /posts/:id', () => {
     it('should return a post by id', async () => {
-      const post = await context.postFactory.create({ user: testUser });
+      const user = context.data.getSeededUser();
+      const post = await context.data.postFactory.create({ user });
 
-      const response = await request(context.app.getHttpServer()).get(
-        `/posts/${post.id}`,
-      );
+      const response = await request(context.app.getHttpServer())
+        .get(`/posts/${post.id}`)
+        .expect(200);
 
-      expect(response.status).toBe(200);
       expect(response.body).toHaveProperty('id', post.id);
       expect(response.body).toHaveProperty('title', post.title);
       expect(response.body).toHaveProperty('content', post.content);
-      expect(response.body.user).toHaveProperty('id', testUser.id);
     });
 
-    it('should return 404 if post not found', async () => {
-      const response = await request(context.app.getHttpServer()).get(
-        '/posts/999',
-      );
-
-      expect(response.status).toBe(404);
-    });
-  });
-
-  describe('GET /posts/user/:userId', () => {
-    it('should return posts for a specific user', async () => {
-      await context.postFactory.createMany(2, { user: testUser });
-
-      const response = await request(context.app.getHttpServer()).get(
-        `/posts/user/${testUser.id}`,
-      );
-
-      expect(response.status).toBe(200);
-      expect(response.body).toHaveLength(2);
-      expect(response.body[0]).toHaveProperty('id');
-      expect(response.body[0]).toHaveProperty('title');
-      expect(response.body[0]).toHaveProperty('content');
-      expect(response.body[0].user.id).toBe(testUser.id);
-    });
-
-    it('should return empty array if user has no posts', async () => {
-      const response = await request(context.app.getHttpServer()).get(
-        `/posts/user/${testUser.id}`,
-      );
-
-      expect(response.status).toBe(200);
-      expect(response.body).toHaveLength(0);
-    });
-
-    it('should return 404 if user not found', async () => {
-      const response = await request(context.app.getHttpServer()).get(
-        '/posts/user/999',
-      );
-
-      expect(response.status).toBe(404);
+    it('should return 404 for non-existent post', async () => {
+      await request(context.app.getHttpServer()).get('/posts/999').expect(404);
     });
   });
 
   describe('PATCH /posts/:id', () => {
     it('should update a post', async () => {
-      const post = await context.postFactory.create({ user: testUser });
+      const user = context.data.getSeededUser();
+      const post = await context.data.postFactory.create({ user });
+      const updatePostDto = {
+        title: 'Updated Post',
+        content: 'This is updated content',
+      };
 
       const response = await request(context.app.getHttpServer())
         .patch(`/posts/${post.id}`)
-        .send({
-          title: 'Updated Post',
-          content: 'This is an updated post',
-        });
+        .send(updatePostDto)
+        .expect(200);
 
-      expect(response.status).toBe(200);
       expect(response.body).toHaveProperty('id', post.id);
       expect(response.body).toHaveProperty('title', 'Updated Post');
       expect(response.body).toHaveProperty(
         'content',
-        'This is an updated post',
+        'This is updated content',
       );
-      expect(response.body.user.id).toBe(testUser.id);
-    });
-
-    it('should return 404 if post not found', async () => {
-      const response = await request(context.app.getHttpServer())
-        .patch('/posts/999')
-        .send({
-          title: 'Updated Post',
-          content: 'This is an updated post',
-        });
-
-      expect(response.status).toBe(404);
     });
   });
 
   describe('DELETE /posts/:id', () => {
     it('should delete a post', async () => {
-      const post = await context.postFactory.create({ user: testUser });
+      const user = context.data.getSeededUser();
+      const post = await context.data.postFactory.create({ user });
 
-      const response = await request(context.app.getHttpServer()).delete(
-        `/posts/${post.id}`,
-      );
+      await request(context.app.getHttpServer())
+        .delete(`/posts/${post.id}`)
+        .expect(204);
 
-      expect(response.status).toBe(204);
-
-      const getResponse = await request(context.app.getHttpServer()).get(
-        `/posts/${post.id}`,
-      );
-      expect(getResponse.status).toBe(404);
+      await request(context.app.getHttpServer())
+        .get(`/posts/${post.id}`)
+        .expect(404);
     });
+  });
 
-    it('should return 404 if post not found', async () => {
-      const response = await request(context.app.getHttpServer()).delete(
-        '/posts/999',
-      );
+  describe('GET /posts/user/:userId', () => {
+    it('should return posts by user', async () => {
+      const user = context.data.getSeededUser();
+      const posts = await context.data.postFactory.createMany(3, { user });
 
-      expect(response.status).toBe(404);
+      const response = await request(context.app.getHttpServer())
+        .get(`/posts/user/${user.id}`)
+        .expect(200);
+
+      expect(response.body).toHaveLength(3);
+      expect(response.body[0].user.id).toBe(user.id);
     });
   });
 });

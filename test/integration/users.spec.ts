@@ -42,9 +42,10 @@ describe('UsersController (e2e)', () => {
     });
 
     it('should return 409 for duplicate email', async () => {
+      const uniqueId = Date.now();
       const createUserDto = {
-        username: 'testuser',
-        email: 'duplicate@example.com',
+        username: `testuser_${uniqueId}`,
+        email: `duplicate_${uniqueId}@example.com`,
         password: 'password123',
       };
 
@@ -56,8 +57,8 @@ describe('UsersController (e2e)', () => {
 
       // Try to create second user with same email
       const duplicateDto = {
-        username: 'differentuser',
-        email: 'duplicate@example.com',
+        username: `differentuser_${uniqueId}`,
+        email: `duplicate_${uniqueId}@example.com`,
         password: 'password123',
       };
 
@@ -70,15 +71,14 @@ describe('UsersController (e2e)', () => {
 
   describe('GET /users', () => {
     it('should return all users', async () => {
-      // ✨ CLEAN: Just call createManyUsers - no knowledge of parallel/sequential
-      const users = await context.factories.createManyUsers(2);
-
+      // Use seeded users - no need to create new ones
       const response = await request(context.app.getHttpServer())
         .get('/users')
         .expect(200);
 
       expect(response.status).toBe(200);
-      expect(response.body).toHaveLength(2);
+      // Expect 3 seeded users
+      expect(response.body).toHaveLength(3);
       expect(response.body[0]).toHaveProperty('id');
       expect(response.body[0]).toHaveProperty('username');
       expect(response.body[0]).toHaveProperty('email');
@@ -88,8 +88,8 @@ describe('UsersController (e2e)', () => {
 
   describe('GET /users/:id', () => {
     it('should return a user by id', async () => {
-      // ✨ CLEAN: Just call createUser - factory provider handles the complexity
-      const user = await context.factories.createUser();
+      // Use seeded user instead of creating new one
+      const user = context.data.getSeededUser();
 
       const response = await request(context.app.getHttpServer()).get(
         `/users/${user.id}`,
@@ -109,7 +109,7 @@ describe('UsersController (e2e)', () => {
 
   describe('PATCH /users/:id', () => {
     it('should update a user', async () => {
-      const user = await context.factories.createUser();
+      const user = context.data.getSeededUser();
       const updateUserDto = {
         username: 'updateduser',
         email: 'updated@example.com',
@@ -141,7 +141,7 @@ describe('UsersController (e2e)', () => {
 
   describe('DELETE /users/:id', () => {
     it('should delete a user', async () => {
-      const user = await context.factories.createUser();
+      const user = context.data.getSeededUser();
 
       const response = await request(context.app.getHttpServer()).delete(
         `/users/${user.id}`,

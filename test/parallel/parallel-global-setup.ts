@@ -1,7 +1,7 @@
 /**
- * Global Test Setup
+ * Parallel Test Global Setup
  *
- * This file runs once before all tests. In parallel mode, it runs once per worker.
+ * This file runs once before all parallel tests. It runs once per worker.
  * It's responsible for setting up the test environment, including databases.
  */
 
@@ -12,8 +12,8 @@ import {
   getTestWorkerEnv,
   isParallelTestMode,
   logWorkerConfig,
-} from './utils/test-config';
-import config from './mikro-orm.config';
+} from './parallel-test-config';
+import config from '../mikro-orm.config';
 
 async function waitForDatabase(
   env: Record<string, string>,
@@ -86,13 +86,13 @@ async function createDatabaseIfNotExists(
   }
 }
 
-export default async function globalSetup() {
+export default async function parallelGlobalSetup() {
   const workerId = getTestWorkerId();
   const env = getTestWorkerEnv();
   const isParallel = isParallelTestMode();
 
   console.log(
-    `🚀 Global setup starting for worker ${workerId}${isParallel ? ' (parallel mode)' : ''}`,
+    `🚀 Parallel global setup starting for worker ${workerId}${isParallel ? ' (parallel mode)' : ''}`,
   );
 
   // Log configuration if debug mode is enabled
@@ -136,9 +136,12 @@ export default async function globalSetup() {
       console.log(`   Port: ${dbEnv.TEST_DB_PORT}`);
     }
   } catch (error) {
-    console.error(`❌ Global setup failed for worker ${workerId}:`, error);
+    console.error(
+      `❌ Parallel global setup failed for worker ${workerId}:`,
+      error,
+    );
     throw error;
   }
 
-  console.log(`✅ Global setup completed for worker ${workerId}`);
+  console.log(`✅ Parallel global setup completed for worker ${workerId}`);
 }

@@ -1,11 +1,31 @@
 import { Options } from '@mikro-orm/core';
-import { getTestWorkerEnv, logWorkerConfig } from './utils/test-config';
 
-// Get worker-specific environment variables
-const testEnv = getTestWorkerEnv();
+/**
+ * Get database configuration for current test mode
+ */
+function getTestDatabaseConfig() {
+  // Check if we're in parallel mode
+  const isParallel =
+    process.env.TEST_PARALLEL === 'true' || process.env.JEST_WORKER_ID;
 
-// Log configuration in debug mode
-logWorkerConfig();
+  if (isParallel) {
+    // Import parallel config only when needed
+    const { getTestWorkerEnv } = require('./parallel/parallel-test-config');
+    return getTestWorkerEnv();
+  } else {
+    // Simple sequential config
+    return {
+      TEST_DB_NAME: process.env.TEST_DB_NAME || 'chirp_test',
+      TEST_DB_HOST: process.env.TEST_DB_HOST || 'localhost',
+      TEST_DB_PORT: process.env.TEST_DB_PORT || '5432',
+      TEST_DB_USER: process.env.TEST_DB_USER || 'postgres',
+      TEST_DB_PASSWORD: process.env.TEST_DB_PASSWORD || 'postgres',
+    };
+  }
+}
+
+// Get appropriate database configuration
+const testEnv = getTestDatabaseConfig();
 
 const config: Options = {
   entities: ['./src/entities/*.entity.ts'],

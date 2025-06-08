@@ -21,8 +21,8 @@ describe('CommentsController (e2e)', () => {
 
   beforeEach(async () => {
     await cleanupDatabase(context);
-    testUser = await context.userFactory.create();
-    testPost = await context.postFactory.create({ user: testUser });
+    testUser = context.data.getSeededUser();
+    testPost = await context.data.postFactory.create({ user: testUser });
   });
 
   afterAll(async () => {
@@ -73,7 +73,7 @@ describe('CommentsController (e2e)', () => {
 
   describe('GET /posts/:id/comments', () => {
     it('should return all comments for a post', async () => {
-      await context.commentFactory.createMany(2, {
+      await context.data.commentFactory.createMany(2, {
         user: testUser,
         post: testPost,
       });
@@ -110,7 +110,7 @@ describe('CommentsController (e2e)', () => {
 
   describe('GET /users/:id/comments', () => {
     it('should return all comments by a user', async () => {
-      await context.commentFactory.createMany(2, {
+      await context.data.commentFactory.createMany(2, {
         user: testUser,
         post: testPost,
       });
@@ -147,7 +147,7 @@ describe('CommentsController (e2e)', () => {
 
   describe('PATCH /comments/:id', () => {
     it('should update a comment', async () => {
-      const comment = await context.commentFactory.create({
+      const comment = await context.data.commentFactory.create({
         user: testUser,
         post: testPost,
       });
@@ -181,7 +181,7 @@ describe('CommentsController (e2e)', () => {
 
   describe('DELETE /comments/:id', () => {
     it('should delete a comment', async () => {
-      const comment = await context.commentFactory.create({
+      const comment = await context.data.commentFactory.create({
         user: testUser,
         post: testPost,
       });

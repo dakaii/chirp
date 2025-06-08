@@ -6,6 +6,7 @@
  */
 
 import { MikroORM } from '@mikro-orm/core';
+import { User } from '../../src/entities/user.entity';
 import {
   getTestWorkerId,
   getParallelTestWorkerEnv,
@@ -71,6 +72,9 @@ export async function setupParallelDatabase() {
     await generator.dropSchema();
     await generator.createSchema();
 
+    // 🎯 SEED BASIC ENTITIES - This solves foreign key issues in parallel workers!
+    await seedBasicEntitiesForWorker(testOrm, workerId.toString());
+
     console.log(
       `✅ Parallel database schema initialized for worker ${workerId}`,
     );
@@ -85,4 +89,29 @@ export async function setupParallelDatabase() {
     );
     throw error;
   }
+}
+
+/**
+ * Seed database with basic entities that factories can reference in parallel workers
+ * This solves foreign key constraint violations without complicating factories
+ */
+async function seedBasicEntitiesForWorker(orm: MikroORM, workerId: string) {
+  const em = orm.em;
+
+  console.log(`🌱 Seeding basic entities for worker ${workerId}...`);
+
+  // Create basic users that will always exist (IDs 1, 2, 3)
+  const users: User[] = [];
+  for (let i = 1; i <= 3; i++) {
+    const user = em.create(User, {
+      id: i,
+      username: `test_user_${i}_worker_${workerId}`,
+      email: `test_user_${i}_worker_${workerId}@example.com`,
+      password: 'password123',
+    });
+    users.push(user);
+  }
+
+  await em.persistAndFlush(users);
+  console.log(`✅ Seeded ${users.length} basic users for worker ${workerId}`);
 }
