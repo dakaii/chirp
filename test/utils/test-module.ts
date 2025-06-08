@@ -29,18 +29,8 @@ export async function cleanupTestingModule(
   await context.orm.close();
 }
 
-// Simple cleanup for unit tests (backwards compatibility)
+// Database cleanup for unit tests - ensures clean state between tests
 export async function cleanupDatabase(context: TestContext): Promise<void> {
   // Use the existing cleanDatabase function for consistency
   await cleanDatabase(context.orm.em);
-}
-
-// Transaction-based test isolation (much more reliable than cleanup)
-export async function withTestTransaction<T>(
-  context: TestContext,
-  testFunction: () => Promise<T>,
-): Promise<T> {
-  return context.orm.em.transactional(async () => {
-    return await testFunction();
-  });
 }
