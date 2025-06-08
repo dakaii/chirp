@@ -1,71 +1,80 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { MikroOrmModule } from '@mikro-orm/nestjs';
-import { EntityManager, MikroORM } from '@mikro-orm/core';
+import { MikroORM } from '@mikro-orm/core';
+import { AppModule } from '../../src/app.module';
 import testConfig from '../mikro-orm.config';
-import { User } from '../../src/entities/user.entity';
-import { Post } from '../../src/entities/post.entity';
-import { Comment } from '../../src/entities/comment.entity';
-import { UsersController } from '../../src/controllers/users.controller';
-import { PostsController } from '../../src/controllers/posts.controller';
-import { CommentsController } from '../../src/controllers/comments.controller';
-import { UsersService } from '../../src/services/users.service';
-import { PostsService } from '../../src/services/posts.service';
-import { CommentsService } from '../../src/services/comments.service';
-import { UserFactory } from '../factories/user.factory';
-import { PostFactory } from '../factories/post.factory';
-import { CommentFactory } from '../factories/comment.factory';
-import { cleanDatabase } from './database';
+import { createFactories } from '../factories';
+import { createControllers } from '../controllers';
+import { TestContext } from '../types';
 
-export interface TestContext {
-  module: TestingModule;
-  orm: MikroORM;
-  em: EntityManager;
-  userFactory: UserFactory;
-  postFactory: PostFactory;
-  commentFactory: CommentFactory;
-  usersController: UsersController;
-  postsController: PostsController;
-  commentsController: CommentsController;
-}
+export { TestContext };
 
 export async function createTestingModule(): Promise<TestContext> {
-  process.env.NODE_ENV = 'test';
-  const orm = await MikroORM.init(testConfig);
+  const moduleFixture: TestingModule = await Test.createTestingModule({
+    imports: [AppModule],
+  })
+    .overrideProvider(MikroORM)
+    .useValue(await MikroORM.init(testConfig))
+    .compile();
 
-  const module = await Test.createTestingModule({
-    imports: [
-      MikroOrmModule.forRoot(testConfig),
-      MikroOrmModule.forFeature([User, Post, Comment]),
-    ],
-    controllers: [UsersController, PostsController, CommentsController],
-    providers: [
-      UsersService,
-      PostsService,
-      CommentsService,
-      UserFactory,
-      PostFactory,
-      CommentFactory,
-    ],
-  }).compile();
+  const orm = moduleFixture.get<MikroORM>(MikroORM);
 
-  const em = module.get<EntityManager>(EntityManager);
-  await cleanDatabase(em);
+  // Use the same EntityManager for the entire test context
+  const em = orm.em;
 
   return {
-    module,
     orm,
-    em,
-    userFactory: module.get<UserFactory>(UserFactory),
-    postFactory: module.get<PostFactory>(PostFactory),
-    commentFactory: module.get<CommentFactory>(CommentFactory),
-    usersController: module.get<UsersController>(UsersController),
-    postsController: module.get<PostsController>(PostsController),
-    commentsController: module.get<CommentsController>(CommentsController),
+    ...createControllers(moduleFixture),
+    ...createFactories(em),
   };
 }
 
-export async function cleanupTestingModule(context: TestContext) {
-  await cleanDatabase(context.em);
+export async function cleanupTestingModule(
+  context: TestContext,
+): Promise<void> {
   await context.orm.close();
-  await context.module.close();
+}
+
+export async function cleanupDatabase(context: TestContext): Promise<void> {
+  const em = context.orm.em.fork();
+
+  try {
+    // For PostgreSQL, we need to delete in the correct order to avoid foreign key violations
+    // Delete comments first (they reference posts and users)
+    await em.nativeDelete('Comment', {});
+
+    // Delete posts second (they reference users)
+    await em.nativeDelete('Post', {});
+
+    // Delete users last (they are referenced by posts and comments)
+    await em.nativeDelete('User', {});
+
+    // Reset sequences
+    await em
+      .getConnection()
+      .execute('ALTER SEQUENCE comment_id_seq RESTART WITH 1');
+    await em
+      .getConnection()
+      .execute('ALTER SEQUENCE post_id_seq RESTART WITH 1');
+    await em
+      .getConnection()
+      .execute('ALTER SEQUENCE user_id_seq RESTART WITH 1');
+  } catch (error) {
+    // Fallback: try with TRUNCATE CASCADE (might work in some PostgreSQL configurations)
+    console.warn(
+      'Native delete failed, trying TRUNCATE CASCADE:',
+      error.message,
+    );
+    try {
+      await em
+        .getConnection()
+        .execute(
+          'TRUNCATE TABLE "comment", "post", "user" RESTART IDENTITY CASCADE',
+        );
+    } catch (truncateError) {
+      console.error('Both cleanup methods failed:', truncateError.message);
+      throw truncateError;
+    }
+  }
+
+  await em.clear();
 }

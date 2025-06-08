@@ -3,17 +3,55 @@ import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { MikroORM } from '@mikro-orm/core';
 import { AppModule } from '../../src/app.module';
 import testConfig from '../mikro-orm.config';
-import { UserFactory } from '../factories/user.factory';
-import { PostFactory } from '../factories/post.factory';
-import { CommentFactory } from '../factories/comment.factory';
-import { cleanDatabase } from './database';
+import { createFactories } from '../factories';
+import { createControllers } from '../controllers';
+import { IntegrationTestContext } from '../types';
 
-export interface IntegrationTestContext {
-  app: INestApplication;
-  orm: MikroORM;
-  userFactory: UserFactory;
-  postFactory: PostFactory;
-  commentFactory: CommentFactory;
+export { IntegrationTestContext };
+
+export async function cleanupDatabase(context: IntegrationTestContext) {
+  const em = context.orm.em.fork();
+
+  try {
+    // For PostgreSQL, we need to delete in the correct order to avoid foreign key violations
+    // Delete comments first (they reference posts and users)
+    await em.nativeDelete('Comment', {});
+
+    // Delete posts second (they reference users)
+    await em.nativeDelete('Post', {});
+
+    // Delete users last (they are referenced by posts and comments)
+    await em.nativeDelete('User', {});
+
+    // Reset sequences
+    await em
+      .getConnection()
+      .execute('ALTER SEQUENCE comment_id_seq RESTART WITH 1');
+    await em
+      .getConnection()
+      .execute('ALTER SEQUENCE post_id_seq RESTART WITH 1');
+    await em
+      .getConnection()
+      .execute('ALTER SEQUENCE user_id_seq RESTART WITH 1');
+  } catch (error) {
+    // Fallback: try with TRUNCATE CASCADE (might work in some PostgreSQL configurations)
+    console.warn(
+      'Native delete failed, trying TRUNCATE CASCADE:',
+      error.message,
+    );
+    try {
+      await em
+        .getConnection()
+        .execute(
+          'TRUNCATE TABLE "comment", "post", "user" RESTART IDENTITY CASCADE',
+        );
+    } catch (truncateError) {
+      console.error('Both cleanup methods failed:', truncateError.message);
+      throw truncateError;
+    }
+  }
+
+  await em.clear();
 }
 
 export async function createIntegrationTestModule(): Promise<IntegrationTestContext> {
@@ -28,25 +66,23 @@ export async function createIntegrationTestModule(): Promise<IntegrationTestCont
   app.useGlobalPipes(new ValidationPipe());
   await app.init();
 
-  const orm = app.get<MikroORM>(MikroORM);
-  const em = orm.em.fork();
+  const orm = moduleFixture.get<MikroORM>(MikroORM);
 
-  await cleanDatabase(em);
+  // Use the same EntityManager for the entire test context
+  const em = orm.em;
 
   return {
     app,
     orm,
-    userFactory: new UserFactory(em),
-    postFactory: new PostFactory(em),
-    commentFactory: new CommentFactory(em),
+    ...createControllers(moduleFixture),
+    ...createFactories(em),
   };
 }
 
 export async function cleanupIntegrationTestModule(
   context: IntegrationTestContext,
 ) {
-  const em = context.orm.em.fork();
-  await cleanDatabase(em);
-  await context.orm.close();
+  await cleanupDatabase(context);
   await context.app.close();
+  await context.orm.close();
 }

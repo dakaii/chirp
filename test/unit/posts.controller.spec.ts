@@ -4,6 +4,7 @@ import {
   TestContext,
   createTestingModule,
   cleanupTestingModule,
+  cleanupDatabase,
 } from '../utils/test-module';
 
 describe('PostsController', () => {
@@ -12,10 +13,12 @@ describe('PostsController', () => {
 
   beforeEach(async () => {
     context = await createTestingModule();
+    await cleanupDatabase(context);
     testUser = await context.userFactory.create();
   });
 
   afterEach(async () => {
+    await cleanupDatabase(context);
     await cleanupTestingModule(context);
   });
 

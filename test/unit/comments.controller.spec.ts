@@ -5,6 +5,7 @@ import {
   TestContext,
   createTestingModule,
   cleanupTestingModule,
+  cleanupDatabase,
 } from '../utils/test-module';
 
 describe('CommentsController', () => {
@@ -14,11 +15,13 @@ describe('CommentsController', () => {
 
   beforeEach(async () => {
     context = await createTestingModule();
+    await cleanupDatabase(context);
     testUser = await context.userFactory.create();
     testPost = await context.postFactory.create({ user: testUser });
   });
 
   afterEach(async () => {
+    await cleanupDatabase(context);
     await cleanupTestingModule(context);
   });
 
@@ -50,7 +53,7 @@ describe('CommentsController', () => {
 
       await expect(
         context.commentsController.create(createCommentDto),
-      ).rejects.toThrow(new NotFoundException('User not found'));
+      ).rejects.toThrow(new NotFoundException('User with ID 999 not found'));
     });
 
     it('should throw not found exception for non-existent post', async () => {
@@ -62,7 +65,7 @@ describe('CommentsController', () => {
 
       await expect(
         context.commentsController.create(createCommentDto),
-      ).rejects.toThrow(new NotFoundException('Post not found'));
+      ).rejects.toThrow(new NotFoundException('Post with ID 999 not found'));
     });
   });
 

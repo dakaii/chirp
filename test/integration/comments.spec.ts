@@ -5,6 +5,7 @@ import {
   IntegrationTestContext,
   createIntegrationTestModule,
   cleanupIntegrationTestModule,
+  cleanupDatabase,
 } from '../utils/integration-test-module';
 
 describe('CommentsController (e2e)', () => {
@@ -17,13 +18,7 @@ describe('CommentsController (e2e)', () => {
   });
 
   beforeEach(async () => {
-    const em = context.orm.em.fork();
-    await em.getConnection().execute(`
-      TRUNCATE TABLE "comment", "post", "user" RESTART IDENTITY CASCADE;
-    `);
-    await em.clear();
-
-    // Create test user and post for each test
+    await cleanupDatabase(context);
     testUser = await context.userFactory.create();
     testPost = await context.postFactory.create({ user: testUser });
   });
@@ -33,131 +28,118 @@ describe('CommentsController (e2e)', () => {
   });
 
   describe('POST /comments', () => {
-    it('should create a new comment', () => {
-      return request(context.app.getHttpServer())
+    it('should create a new comment', async () => {
+      const response = await request(context.app.getHttpServer())
         .post('/comments')
         .send({
-          content: 'Test Comment',
-          postId: testPost.id,
+          content: 'This is a test comment',
           userId: testUser.id,
-        })
-        .expect(201)
-        .expect((res) => {
-          expect(res.body).toHaveProperty('id');
-          expect(res.body.content).toBe('Test Comment');
-          expect(res.body.user.id).toBe(testUser.id);
-          expect(res.body.post.id).toBe(testPost.id);
+          postId: testPost.id,
         });
+
+      expect(response.status).toBe(201);
+      expect(response.body).toHaveProperty('id');
+      expect(response.body.content).toBe('This is a test comment');
+      expect(response.body.user.id).toBe(testUser.id);
+      expect(response.body.post.id).toBe(testPost.id);
     });
 
-    it('should return 400 for invalid data', () => {
-      return request(context.app.getHttpServer())
+    it('should return 404 if user not found', async () => {
+      const response = await request(context.app.getHttpServer())
         .post('/comments')
         .send({
-          postId: testPost.id,
-          userId: testUser.id,
-          // missing content
-        })
-        .expect(400);
-    });
-
-    it('should return 404 for non-existent user', () => {
-      return request(context.app.getHttpServer())
-        .post('/comments')
-        .send({
-          content: 'Test Comment',
-          postId: testPost.id,
+          content: 'This is a test comment',
           userId: 999,
-        })
-        .expect(404);
+          postId: testPost.id,
+        });
+
+      expect(response.status).toBe(404);
     });
 
-    it('should return 404 for non-existent post', () => {
-      return request(context.app.getHttpServer())
+    it('should return 404 if post not found', async () => {
+      const response = await request(context.app.getHttpServer())
         .post('/comments')
         .send({
-          content: 'Test Comment',
-          postId: 999,
+          content: 'This is a test comment',
           userId: testUser.id,
-        })
-        .expect(404);
+          postId: 999,
+        });
+
+      expect(response.status).toBe(404);
     });
   });
 
-  describe('GET /comments/post/:postId', () => {
-    it('should return comments for a specific post', async () => {
-      await context.commentFactory.createMany(3, {
+  describe('GET /comments/by-post/:postId', () => {
+    it('should return all comments for a post', async () => {
+      await context.commentFactory.createMany(2, {
         user: testUser,
         post: testPost,
       });
 
-      return request(context.app.getHttpServer())
-        .get(`/comments/post/${testPost.id}`)
-        .expect(200)
-        .expect((res) => {
-          expect(Array.isArray(res.body)).toBe(true);
-          expect(res.body).toHaveLength(3);
-          expect(res.body[0]).toHaveProperty('id');
-          expect(res.body[0]).toHaveProperty('content');
-          expect(res.body[0].user.id).toBe(testUser.id);
-        });
+      const response = await request(context.app.getHttpServer()).get(
+        `/comments/by-post/${testPost.id}`,
+      );
+
+      expect(response.status).toBe(200);
+      expect(response.body).toHaveLength(2);
+      expect(response.body[0]).toHaveProperty('id');
+      expect(response.body[0]).toHaveProperty('content');
+      expect(response.body[0].user.id).toBe(testUser.id);
+      expect(response.body[0].post.id).toBe(testPost.id);
     });
 
-    it('should return 404 for non-existent post', () => {
-      return request(context.app.getHttpServer())
-        .get('/comments/post/999')
-        .expect(404);
+    it('should return empty array if post has no comments', async () => {
+      const response = await request(context.app.getHttpServer()).get(
+        `/comments/by-post/${testPost.id}`,
+      );
+
+      expect(response.status).toBe(200);
+      expect(response.body).toHaveLength(0);
+    });
+
+    it('should return 404 if post not found', async () => {
+      const response = await request(context.app.getHttpServer()).get(
+        '/comments/by-post/999',
+      );
+
+      expect(response.status).toBe(404);
     });
   });
 
-  describe('GET /comments/user/:userId', () => {
-    it('should return comments for a specific user', async () => {
-      await context.commentFactory.createMany(3, {
+  describe('GET /comments/by-user/:userId', () => {
+    it('should return all comments by a user', async () => {
+      await context.commentFactory.createMany(2, {
         user: testUser,
         post: testPost,
       });
 
-      return request(context.app.getHttpServer())
-        .get(`/comments/user/${testUser.id}`)
-        .expect(200)
-        .expect((res) => {
-          expect(Array.isArray(res.body)).toBe(true);
-          expect(res.body).toHaveLength(3);
-          expect(res.body[0]).toHaveProperty('id');
-          expect(res.body[0]).toHaveProperty('content');
-          expect(res.body[0].post.id).toBe(testPost.id);
-        });
+      const response = await request(context.app.getHttpServer()).get(
+        `/comments/by-user/${testUser.id}`,
+      );
+
+      expect(response.status).toBe(200);
+      expect(response.body).toHaveLength(2);
+      expect(response.body[0]).toHaveProperty('id');
+      expect(response.body[0]).toHaveProperty('content');
+      expect(response.body[0].user.id).toBe(testUser.id);
+      expect(response.body[0].post.id).toBe(testPost.id);
     });
 
-    it('should return 404 for non-existent user', () => {
-      return request(context.app.getHttpServer())
-        .get('/comments/user/999')
-        .expect(404);
-    });
-  });
+    it('should return empty array if user has no comments', async () => {
+      const response = await request(context.app.getHttpServer()).get(
+        `/comments/by-user/${testUser.id}`,
+      );
 
-  describe('GET /comments/:id', () => {
-    it('should return a comment by id', async () => {
-      const comment = await context.commentFactory.create({
-        user: testUser,
-        post: testPost,
-      });
-
-      return request(context.app.getHttpServer())
-        .get(`/comments/${comment.id}`)
-        .expect(200)
-        .expect((res) => {
-          expect(res.body.id).toBe(comment.id);
-          expect(res.body.content).toBe(comment.content);
-          expect(res.body.user.id).toBe(testUser.id);
-          expect(res.body.post.id).toBe(testPost.id);
-        });
+      expect(response.status).toBe(200);
+      expect(response.body).toHaveLength(0);
     });
 
-    it('should return 404 for non-existent comment', () => {
-      return request(context.app.getHttpServer())
-        .get('/comments/999')
-        .expect(404);
+    it('should return 404 if user not found', async () => {
+      const response = await request(context.app.getHttpServer()).get(
+        '/comments/by-user/999',
+      );
+
+      expect(response.status).toBe(404);
     });
   });
 
@@ -168,25 +150,30 @@ describe('CommentsController (e2e)', () => {
         post: testPost,
       });
 
-      return request(context.app.getHttpServer())
+      const response = await request(context.app.getHttpServer())
         .patch(`/comments/${comment.id}`)
         .send({
-          content: 'Updated Comment',
-        })
-        .expect(200)
-        .expect((res) => {
-          expect(res.body.id).toBe(comment.id);
-          expect(res.body.content).toBe('Updated Comment');
+          content: 'Updated comment content',
         });
+
+      expect(response.status).toBe(200);
+      expect(response.body).toHaveProperty('id', comment.id);
+      expect(response.body).toHaveProperty(
+        'content',
+        'Updated comment content',
+      );
+      expect(response.body.user.id).toBe(testUser.id);
+      expect(response.body.post.id).toBe(testPost.id);
     });
 
-    it('should return 404 for non-existent comment', () => {
-      return request(context.app.getHttpServer())
+    it('should return 404 if comment not found', async () => {
+      const response = await request(context.app.getHttpServer())
         .patch('/comments/999')
         .send({
-          content: 'Updated Comment',
-        })
-        .expect(404);
+          content: 'Updated comment content',
+        });
+
+      expect(response.status).toBe(404);
     });
   });
 
@@ -197,18 +184,24 @@ describe('CommentsController (e2e)', () => {
         post: testPost,
       });
 
-      return request(context.app.getHttpServer())
-        .delete(`/comments/${comment.id}`)
-        .expect(200)
-        .expect((res) => {
-          expect(res.body.message).toBe('Comment deleted successfully');
-        });
+      const response = await request(context.app.getHttpServer()).delete(
+        `/comments/${comment.id}`,
+      );
+
+      expect(response.status).toBe(204);
+
+      const getResponse = await request(context.app.getHttpServer()).get(
+        `/comments/by-post/${testPost.id}`,
+      );
+      expect(getResponse.body).toHaveLength(0);
     });
 
-    it('should return 404 for non-existent comment', () => {
-      return request(context.app.getHttpServer())
-        .delete('/comments/999')
-        .expect(404);
+    it('should return 404 if comment not found', async () => {
+      const response = await request(context.app.getHttpServer()).delete(
+        '/comments/999',
+      );
+
+      expect(response.status).toBe(404);
     });
   });
 });

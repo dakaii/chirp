@@ -3,16 +3,19 @@ import {
   TestContext,
   createTestingModule,
   cleanupTestingModule,
+  cleanupDatabase,
 } from '../utils/test-module';
 
-describe('UsersController', () => {
+describe('UsersController (Integration)', () => {
   let context: TestContext;
 
   beforeEach(async () => {
     context = await createTestingModule();
+    await cleanupDatabase(context);
   });
 
   afterEach(async () => {
+    await cleanupDatabase(context);
     await cleanupTestingModule(context);
   });
 

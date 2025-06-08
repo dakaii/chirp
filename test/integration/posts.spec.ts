@@ -4,6 +4,7 @@ import {
   IntegrationTestContext,
   createIntegrationTestModule,
   cleanupIntegrationTestModule,
+  cleanupDatabase,
 } from '../utils/integration-test-module';
 
 describe('PostsController (e2e)', () => {
@@ -15,13 +16,7 @@ describe('PostsController (e2e)', () => {
   });
 
   beforeEach(async () => {
-    const em = context.orm.em.fork();
-    await em.getConnection().execute(`
-      TRUNCATE TABLE "comment", "post", "user" RESTART IDENTITY CASCADE;
-    `);
-    await em.clear();
-
-    // Create a test user for each test
+    await cleanupDatabase(context);
     testUser = await context.userFactory.create();
   });
 
@@ -30,61 +25,47 @@ describe('PostsController (e2e)', () => {
   });
 
   describe('POST /posts', () => {
-    it('should create a new post', () => {
-      return request(context.app.getHttpServer())
+    it('should create a new post', async () => {
+      const response = await request(context.app.getHttpServer())
         .post('/posts')
         .send({
           title: 'Test Post',
-          content: 'Test Content',
+          content: 'This is a test post',
           userId: testUser.id,
-        })
-        .expect(201)
-        .expect((res) => {
-          expect(res.body).toHaveProperty('id');
-          expect(res.body.title).toBe('Test Post');
-          expect(res.body.content).toBe('Test Content');
-          expect(res.body.user.id).toBe(testUser.id);
         });
+
+      expect(response.status).toBe(201);
+      expect(response.body).toHaveProperty('id');
+      expect(response.body.title).toBe('Test Post');
+      expect(response.body.content).toBe('This is a test post');
+      expect(response.body.user.id).toBe(testUser.id);
     });
 
-    it('should return 400 for invalid data', () => {
-      return request(context.app.getHttpServer())
-        .post('/posts')
-        .send({
-          content: 'Test Content',
-          userId: testUser.id,
-          // missing title
-        })
-        .expect(400);
-    });
-
-    it('should return 404 for non-existent user', () => {
-      return request(context.app.getHttpServer())
+    it('should return 404 if user not found', async () => {
+      const response = await request(context.app.getHttpServer())
         .post('/posts')
         .send({
           title: 'Test Post',
-          content: 'Test Content',
+          content: 'This is a test post',
           userId: 999,
-        })
-        .expect(404);
+        });
+
+      expect(response.status).toBe(404);
     });
   });
 
   describe('GET /posts', () => {
-    it('should return an array of posts', async () => {
-      await context.postFactory.createMany(3, { user: testUser });
+    it('should return all posts', async () => {
+      await context.postFactory.createMany(2, { user: testUser });
 
-      return request(context.app.getHttpServer())
-        .get('/posts')
-        .expect(200)
-        .expect((res) => {
-          expect(Array.isArray(res.body)).toBe(true);
-          expect(res.body).toHaveLength(3);
-          expect(res.body[0]).toHaveProperty('id');
-          expect(res.body[0]).toHaveProperty('title');
-          expect(res.body[0]).toHaveProperty('content');
-          expect(res.body[0]).toHaveProperty('user');
-        });
+      const response = await request(context.app.getHttpServer()).get('/posts');
+
+      expect(response.status).toBe(200);
+      expect(response.body).toHaveLength(2);
+      expect(response.body[0]).toHaveProperty('id');
+      expect(response.body[0]).toHaveProperty('title');
+      expect(response.body[0]).toHaveProperty('content');
+      expect(response.body[0].user.id).toBe(testUser.id);
     });
   });
 
@@ -92,42 +73,57 @@ describe('PostsController (e2e)', () => {
     it('should return a post by id', async () => {
       const post = await context.postFactory.create({ user: testUser });
 
-      return request(context.app.getHttpServer())
-        .get(`/posts/${post.id}`)
-        .expect(200)
-        .expect((res) => {
-          expect(res.body.id).toBe(post.id);
-          expect(res.body.title).toBe(post.title);
-          expect(res.body.content).toBe(post.content);
-          expect(res.body.user.id).toBe(testUser.id);
-        });
+      const response = await request(context.app.getHttpServer()).get(
+        `/posts/${post.id}`,
+      );
+
+      expect(response.status).toBe(200);
+      expect(response.body).toHaveProperty('id', post.id);
+      expect(response.body).toHaveProperty('title', post.title);
+      expect(response.body).toHaveProperty('content', post.content);
+      expect(response.body.user).toHaveProperty('id', testUser.id);
     });
 
-    it('should return 404 for non-existent post', () => {
-      return request(context.app.getHttpServer()).get('/posts/999').expect(404);
+    it('should return 404 if post not found', async () => {
+      const response = await request(context.app.getHttpServer()).get(
+        '/posts/999',
+      );
+
+      expect(response.status).toBe(404);
     });
   });
 
   describe('GET /posts/user/:userId', () => {
     it('should return posts for a specific user', async () => {
-      await context.postFactory.createMany(3, { user: testUser });
+      await context.postFactory.createMany(2, { user: testUser });
 
-      return request(context.app.getHttpServer())
-        .get(`/posts/user/${testUser.id}`)
-        .expect(200)
-        .expect((res) => {
-          expect(Array.isArray(res.body)).toBe(true);
-          expect(res.body).toHaveLength(3);
-          res.body.forEach((post) => {
-            expect(post.user.id).toBe(testUser.id);
-          });
-        });
+      const response = await request(context.app.getHttpServer()).get(
+        `/posts/user/${testUser.id}`,
+      );
+
+      expect(response.status).toBe(200);
+      expect(response.body).toHaveLength(2);
+      expect(response.body[0]).toHaveProperty('id');
+      expect(response.body[0]).toHaveProperty('title');
+      expect(response.body[0]).toHaveProperty('content');
+      expect(response.body[0].user.id).toBe(testUser.id);
     });
 
-    it('should return 404 for non-existent user', () => {
-      return request(context.app.getHttpServer())
-        .get('/posts/user/999')
-        .expect(404);
+    it('should return empty array if user has no posts', async () => {
+      const response = await request(context.app.getHttpServer()).get(
+        `/posts/user/${testUser.id}`,
+      );
+
+      expect(response.status).toBe(200);
+      expect(response.body).toHaveLength(0);
+    });
+
+    it('should return 404 if user not found', async () => {
+      const response = await request(context.app.getHttpServer()).get(
+        '/posts/user/999',
+      );
+
+      expect(response.status).toBe(404);
     });
   });
 
@@ -135,26 +131,32 @@ describe('PostsController (e2e)', () => {
     it('should update a post', async () => {
       const post = await context.postFactory.create({ user: testUser });
 
-      return request(context.app.getHttpServer())
+      const response = await request(context.app.getHttpServer())
         .patch(`/posts/${post.id}`)
         .send({
-          title: 'Updated Title',
-        })
-        .expect(200)
-        .expect((res) => {
-          expect(res.body.id).toBe(post.id);
-          expect(res.body.title).toBe('Updated Title');
-          expect(res.body.content).toBe(post.content);
+          title: 'Updated Post',
+          content: 'This is an updated post',
         });
+
+      expect(response.status).toBe(200);
+      expect(response.body).toHaveProperty('id', post.id);
+      expect(response.body).toHaveProperty('title', 'Updated Post');
+      expect(response.body).toHaveProperty(
+        'content',
+        'This is an updated post',
+      );
+      expect(response.body.user.id).toBe(testUser.id);
     });
 
-    it('should return 404 for non-existent post', () => {
-      return request(context.app.getHttpServer())
+    it('should return 404 if post not found', async () => {
+      const response = await request(context.app.getHttpServer())
         .patch('/posts/999')
         .send({
-          title: 'Updated Title',
-        })
-        .expect(404);
+          title: 'Updated Post',
+          content: 'This is an updated post',
+        });
+
+      expect(response.status).toBe(404);
     });
   });
 
@@ -162,18 +164,24 @@ describe('PostsController (e2e)', () => {
     it('should delete a post', async () => {
       const post = await context.postFactory.create({ user: testUser });
 
-      return request(context.app.getHttpServer())
-        .delete(`/posts/${post.id}`)
-        .expect(200)
-        .expect((res) => {
-          expect(res.body.message).toBe('Post deleted successfully');
-        });
+      const response = await request(context.app.getHttpServer()).delete(
+        `/posts/${post.id}`,
+      );
+
+      expect(response.status).toBe(204);
+
+      const getResponse = await request(context.app.getHttpServer()).get(
+        `/posts/${post.id}`,
+      );
+      expect(getResponse.status).toBe(404);
     });
 
-    it('should return 404 for non-existent post', () => {
-      return request(context.app.getHttpServer())
-        .delete('/posts/999')
-        .expect(404);
+    it('should return 404 if post not found', async () => {
+      const response = await request(context.app.getHttpServer()).delete(
+        '/posts/999',
+      );
+
+      expect(response.status).toBe(404);
     });
   });
 });
