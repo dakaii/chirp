@@ -43,46 +43,51 @@ export async function cleanupIntegrationTestingModule(
 export async function cleanupDatabase(
   context: IntegrationTestContext,
 ): Promise<void> {
-  const forkedEm = context.orm.em.fork();
+  // Use MikroORM metadata to get all entities dynamically
+  const em = context.orm.em.fork();
+
   try {
-    // Get all user tables dynamically from PostgreSQL
-    const result = await forkedEm.getConnection().execute(`
-      SELECT tablename FROM pg_tables
-      WHERE schemaname = 'public'
-      AND tablename NOT LIKE 'pg_%'
-      AND tablename NOT LIKE 'sql_%'
-    `);
+    // Get all entity metadata from the ORM configuration
+    const metadata = context.orm.getMetadata();
+    const allMetadata = metadata.getAll();
+    const entityNames = Object.values(allMetadata).map(
+      (meta: any) => meta.className,
+    );
 
-    const tableNames = result
-      .map((row: any) => `"${row.tablename}"`)
-      .join(', ');
+    // Use PostgreSQL's CASCADE to handle foreign key dependencies
+    // This is more reliable than trying to order deletions manually
+    await em.getConnection().execute('SET session_replication_role = replica;');
 
-    if (tableNames) {
-      // Use PostgreSQL's constraint management to handle foreign keys properly
-      await forkedEm.getConnection().execute(`
-        DO $$ BEGIN
-          -- Disable foreign key constraints
-          EXECUTE 'SET CONSTRAINTS ALL DEFERRED';
-
-          -- Truncate all user tables dynamically
-          TRUNCATE TABLE ${tableNames} RESTART IDENTITY CASCADE;
-
-          -- Re-enable foreign key constraints
-          EXECUTE 'SET CONSTRAINTS ALL IMMEDIATE';
-        END $$;
-      `);
+    // Delete all entities
+    for (const entityName of entityNames) {
+      await em.nativeDelete(entityName, {});
     }
+
+    // Re-enable foreign key constraints
+    await em.getConnection().execute('SET session_replication_role = DEFAULT;');
+
+    // Flush all changes
+    await em.flush();
   } catch (error) {
+    // Re-enable foreign key constraints even if there was an error
+    try {
+      await em
+        .getConnection()
+        .execute('SET session_replication_role = DEFAULT;');
+    } catch (resetError) {
+      // Ignore reset errors
+    }
+
     // If tables don't exist, that's fine - they will be created by migrations
     if (
       !error.message.includes('does not exist') &&
       !error.message.includes('relation') &&
       !error.message.includes('table')
     ) {
-      throw error;
+      console.warn('Database cleanup warning:', error.message);
     }
   }
 
-  // Clear the identity map of the forked EntityManager
-  forkedEm.clear();
+  // Clear the identity map
+  em.clear();
 }

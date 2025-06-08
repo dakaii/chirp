@@ -7,22 +7,19 @@ export class PostFactory {
   constructor(private readonly em: EntityManager) {}
 
   async create(data: Partial<Post> & { user?: User } = {}): Promise<Post> {
-    // Fork the EntityManager to avoid conflicts
-    const em = this.em.fork();
-
     let { user, ...rest } = data;
 
-    // If no user is provided, create one
+    // If no user is provided, create one in the same context
     if (!user) {
-      user = em.create(User, {
+      user = this.em.create(User, {
         username: faker.internet.userName(),
         email: faker.internet.email(),
         password: faker.internet.password(),
       });
-      await em.persistAndFlush(user);
+      await this.em.persistAndFlush(user);
     }
 
-    const post = em.create(Post, {
+    const post = this.em.create(Post, {
       title: faker.lorem.sentence(),
       content: faker.lorem.paragraphs(3),
       createdAt: new Date(),
@@ -30,7 +27,7 @@ export class PostFactory {
       ...rest,
     });
 
-    await em.persistAndFlush(post);
+    await this.em.persistAndFlush(post);
     return post;
   }
 
@@ -38,23 +35,20 @@ export class PostFactory {
     count: number,
     data: Partial<Post> & { user?: User } = {},
   ): Promise<Post[]> {
-    // Fork the EntityManager to avoid conflicts
-    const em = this.em.fork();
-
     let { user, ...rest } = data;
 
-    // If no user is provided, create one
+    // If no user is provided, create one in the same context
     if (!user) {
-      user = em.create(User, {
+      user = this.em.create(User, {
         username: faker.internet.userName(),
         email: faker.internet.email(),
         password: faker.internet.password(),
       });
-      await em.persistAndFlush(user);
+      await this.em.persistAndFlush(user);
     }
 
     const posts = Array.from({ length: count }, () =>
-      em.create(Post, {
+      this.em.create(Post, {
         title: faker.lorem.sentence(),
         content: faker.lorem.paragraphs(3),
         createdAt: new Date(),
@@ -63,7 +57,7 @@ export class PostFactory {
       }),
     );
 
-    await em.persistAndFlush(posts);
+    await this.em.persistAndFlush(posts);
     return posts;
   }
 }
