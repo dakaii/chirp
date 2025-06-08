@@ -1,15 +1,22 @@
 import { Options } from '@mikro-orm/core';
 import { TsMorphMetadataProvider } from '@mikro-orm/reflection';
+import { getTestWorkerEnv, logWorkerConfig } from './utils/test-config';
+
+// Get worker-specific environment variables
+const testEnv = getTestWorkerEnv();
+
+// Log configuration in debug mode
+logWorkerConfig();
 
 const config: Options = {
   metadataProvider: TsMorphMetadataProvider,
   entities: ['./src/entities/*.entity.ts'],
   type: 'postgresql',
-  dbName: process.env.TEST_DB_NAME || 'chirp_test',
-  host: process.env.TEST_DB_HOST || 'test-db',
-  port: +(process.env.TEST_DB_PORT || 5432),
-  user: process.env.TEST_DB_USER || 'postgres',
-  password: process.env.TEST_DB_PASSWORD || 'postgres',
+  dbName: testEnv.TEST_DB_NAME,
+  host: testEnv.TEST_DB_HOST,
+  port: parseInt(testEnv.TEST_DB_PORT, 10),
+  user: testEnv.TEST_DB_USER,
+  password: testEnv.TEST_DB_PASSWORD,
   debug: false,
   allowGlobalContext: true,
   // Schema generator configuration (Django-like approach)
@@ -24,6 +31,13 @@ const config: Options = {
   forceUtcTimezone: true,
   // Use transactions for tests
   implicitTransactions: true,
+  // Connection pool settings optimized for testing
+  pool: {
+    min: 1,
+    max: 5, // Lower max connections for test environment
+    acquireTimeoutMillis: 60000,
+    idleTimeoutMillis: 30000,
+  },
 };
 
 export default config;
