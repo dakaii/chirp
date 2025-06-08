@@ -6,7 +6,6 @@
  */
 
 import { MikroORM } from '@mikro-orm/core';
-import { User } from '../src/entities/user.entity';
 import mikroOrmConfig from './mikro-orm.config';
 
 // Increase timeout for database operations
@@ -51,9 +50,6 @@ if (process.env.TEST_PARALLEL === 'true') {
       await generator.dropSchema();
       await generator.createSchema();
 
-      // 🎯 SEED BASIC ENTITIES - This solves foreign key issues!
-      await seedBasicEntities(testOrm);
-
       console.log('✅ Database schema initialized');
 
       await testOrm.close();
@@ -63,35 +59,6 @@ if (process.env.TEST_PARALLEL === 'true') {
       console.error('❌ Sequential database setup failed:', error);
       throw error;
     }
-  }
-
-  /**
-   * Seed database with basic entities that factories can reference
-   * This solves foreign key constraint violations without complicating factories
-   */
-  async function seedBasicEntities(orm: MikroORM) {
-    const em = orm.em;
-
-    console.log('🌱 Seeding basic entities...');
-
-    // Create basic users that will always exist (IDs 1, 2, 3)
-    const users: User[] = [];
-    for (let i = 1; i <= 3; i++) {
-      const user = em.create(User, {
-        id: i,
-        username: `test_user_${i}`,
-        email: `test_user_${i}@example.com`,
-        password: 'password123',
-      });
-      users.push(user);
-    }
-
-    await em.persistAndFlush(users);
-
-    // Reset the auto-increment sequence to start after the seeded users
-    await em.getConnection().execute(`SELECT setval('user_id_seq', 3, true)`);
-
-    console.log(`✅ Seeded ${users.length} basic users`);
   }
 
   // Setup once before all tests

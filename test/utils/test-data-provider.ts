@@ -1,12 +1,11 @@
 /**
- * Test Data Provider - Provides Seeded Entities to Tests
+ * Test Data Provider - Provides Factories to Tests
  *
- * Simple provider that gives access to seeded entities and factories.
- * No redundant wrapper functions - just clean access to what you need.
+ * Simple provider that gives access to factories for creating test data.
+ * Each test creates exactly what it needs using factories.
  */
 
 import { EntityManager } from '@mikro-orm/core';
-import { User } from '../../src/entities/user.entity';
 import { UserFactory } from '../factories/user.factory';
 import { PostFactory } from '../factories/post.factory';
 import { CommentFactory } from '../factories/comment.factory';
@@ -21,13 +20,6 @@ export class TestDataProvider {
     this.userFactory = new UserFactory(em);
     this.postFactory = new PostFactory(em);
     this.commentFactory = new CommentFactory(em);
-  }
-
-  /**
-   * Get a seeded user that exists in every worker database
-   */
-  getSeededUser(id: number = 1): User {
-    return this.em.getReference(User, id);
   }
 }
 

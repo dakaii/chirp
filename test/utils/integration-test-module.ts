@@ -21,37 +21,6 @@ export interface IntegrationTestContext {
   data: TestDataProvider;
 }
 
-/**
- * Ensure seeded users exist in the database for tests to reference
- */
-async function ensureSeededUsers(orm: MikroORM): Promise<void> {
-  const em = orm.em.fork();
-
-  // Check if seeded users already exist
-  const existingUsers = await em.find(User, { id: { $in: [1, 2, 3] } });
-
-  if (existingUsers.length < 3) {
-    console.log('🌱 Creating seeded users for integration tests...');
-
-    // Create/update seeded users
-    for (let i = 1; i <= 3; i++) {
-      let user = await em.findOne(User, { id: i });
-
-      if (!user) {
-        user = em.create(User, {
-          id: i,
-          username: `test_user_${i}`,
-          email: `test_user_${i}@example.com`,
-          password: 'password123',
-        });
-      }
-    }
-
-    await em.flush();
-    console.log('✅ Seeded users ready for integration tests');
-  }
-}
-
 export async function createIntegrationTestingModule(): Promise<IntegrationTestContext> {
   const moduleFixture: TestingModule = await Test.createTestingModule({
     imports: [
@@ -67,10 +36,7 @@ export async function createIntegrationTestingModule(): Promise<IntegrationTestC
 
   const orm = moduleFixture.get<MikroORM>(MikroORM);
 
-  // Ensure seeded users exist for this test context
-  await ensureSeededUsers(orm);
-
-  // Create data provider that handles entity provision from outside
+  // Create data provider that handles entity creation with factories
   const data = createTestDataProvider(orm.em);
 
   return {
@@ -93,11 +59,10 @@ export async function cleanupDatabase(
 ): Promise<void> {
   const em = context.orm.em.fork();
 
-  // Clean tables in correct order (handle foreign keys)
+  // Clean all tables completely - no seeded data to preserve
   await em.nativeDelete(Comment, {});
   await em.nativeDelete(Post, {});
-  // Only delete users that are NOT seeded (preserve IDs 1, 2, 3)
-  await em.nativeDelete(User, { id: { $gt: 3 } });
+  await em.nativeDelete(User, {});
 
-  console.log('Cleaning database tables (preserving seeded users)');
+  console.log('✅ Database tables cleaned');
 }

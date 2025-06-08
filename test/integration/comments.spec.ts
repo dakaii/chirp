@@ -21,7 +21,7 @@ describe('CommentsController (e2e)', () => {
 
   beforeEach(async () => {
     await cleanupDatabase(context);
-    testUser = context.data.getSeededUser();
+    testUser = await context.data.userFactory.create();
     testPost = await context.data.postFactory.create({ user: testUser });
   });
 

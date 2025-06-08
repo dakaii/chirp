@@ -23,7 +23,7 @@ describe('PostsController (e2e)', () => {
 
   describe('POST /posts', () => {
     it('should create a new post', async () => {
-      const user = context.data.getSeededUser();
+      const user = await context.data.userFactory.create();
 
       const createPostDto = {
         title: 'Test Post',
@@ -45,7 +45,7 @@ describe('PostsController (e2e)', () => {
 
   describe('GET /posts', () => {
     it('should return all posts', async () => {
-      const user = context.data.getSeededUser();
+      const user = await context.data.userFactory.create();
       const posts = await Promise.all([
         context.data.postFactory.create({ title: 'Post 1', user }),
         context.data.postFactory.create({ title: 'Post 2', user }),
@@ -64,7 +64,7 @@ describe('PostsController (e2e)', () => {
 
   describe('GET /posts/:id', () => {
     it('should return a post by id', async () => {
-      const user = context.data.getSeededUser();
+      const user = await context.data.userFactory.create();
       const post = await context.data.postFactory.create({ user });
 
       const response = await request(context.app.getHttpServer())
@@ -83,7 +83,7 @@ describe('PostsController (e2e)', () => {
 
   describe('PATCH /posts/:id', () => {
     it('should update a post', async () => {
-      const user = context.data.getSeededUser();
+      const user = await context.data.userFactory.create();
       const post = await context.data.postFactory.create({ user });
       const updatePostDto = {
         title: 'Updated Post',
@@ -106,7 +106,7 @@ describe('PostsController (e2e)', () => {
 
   describe('DELETE /posts/:id', () => {
     it('should delete a post', async () => {
-      const user = context.data.getSeededUser();
+      const user = await context.data.userFactory.create();
       const post = await context.data.postFactory.create({ user });
 
       await request(context.app.getHttpServer())
@@ -121,7 +121,7 @@ describe('PostsController (e2e)', () => {
 
   describe('GET /posts/user/:userId', () => {
     it('should return posts by user', async () => {
-      const user = context.data.getSeededUser();
+      const user = await context.data.userFactory.create();
       const posts = await context.data.postFactory.createMany(3, { user });
 
       const response = await request(context.app.getHttpServer())
