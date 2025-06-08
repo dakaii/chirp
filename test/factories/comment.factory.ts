@@ -10,34 +10,36 @@ export class CommentFactory {
   async create(
     data: Partial<Comment> & { user?: User; post?: Post } = {},
   ): Promise<Comment> {
-    let { user, post, ...rest } = data;
+    const { user, post, ...rest } = data;
 
-    // If no user is provided, create one in the same context
-    if (!user) {
-      user = this.em.create(User, {
-        username: faker.internet.userName(),
-        email: faker.internet.email(),
+    // Get or create user
+    let targetUser = user;
+    if (!targetUser) {
+      targetUser = this.em.create(User, {
+        username: `${faker.internet.userName()}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        email: `${Date.now()}_${Math.random().toString(36).substr(2, 9)}@${faker.internet.domainName()}`,
         password: faker.internet.password(),
       });
-      await this.em.persistAndFlush(user);
+      await this.em.persistAndFlush(targetUser);
     }
 
-    // If no post is provided, create one in the same context (using the user we already have)
-    if (!post) {
-      post = this.em.create(Post, {
+    // Get or create post
+    let targetPost = post;
+    if (!targetPost) {
+      targetPost = this.em.create(Post, {
         title: faker.lorem.sentence(),
         content: faker.lorem.paragraphs(3),
         createdAt: new Date(),
-        user, // Use the user we already have
+        user: targetUser,
       });
-      await this.em.persistAndFlush(post);
+      await this.em.persistAndFlush(targetPost);
     }
 
     const comment = this.em.create(Comment, {
-      content: faker.lorem.sentence(),
+      content: faker.lorem.paragraph(),
       createdAt: new Date(),
-      user,
-      post,
+      user: targetUser,
+      post: targetPost,
       ...rest,
     });
 
@@ -49,38 +51,42 @@ export class CommentFactory {
     count: number,
     data: Partial<Comment> & { user?: User; post?: Post } = {},
   ): Promise<Comment[]> {
-    let { user, post, ...rest } = data;
+    const { user, post, ...rest } = data;
 
-    // If no user is provided, create one in the same context
-    if (!user) {
-      user = this.em.create(User, {
-        username: faker.internet.userName(),
-        email: faker.internet.email(),
+    // Get or create user once for all comments
+    let targetUser = user;
+    if (!targetUser) {
+      targetUser = this.em.create(User, {
+        username: `${faker.internet.userName()}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        email: `${Date.now()}_${Math.random().toString(36).substr(2, 9)}@${faker.internet.domainName()}`,
         password: faker.internet.password(),
       });
-      await this.em.persistAndFlush(user);
+      await this.em.persistAndFlush(targetUser);
     }
 
-    // If no post is provided, create one in the same context (using the user we already have)
-    if (!post) {
-      post = this.em.create(Post, {
+    // Get or create post once for all comments
+    let targetPost = post;
+    if (!targetPost) {
+      targetPost = this.em.create(Post, {
         title: faker.lorem.sentence(),
         content: faker.lorem.paragraphs(3),
         createdAt: new Date(),
-        user, // Use the user we already have
+        user: targetUser,
       });
-      await this.em.persistAndFlush(post);
+      await this.em.persistAndFlush(targetPost);
     }
 
-    const comments = Array.from({ length: count }, () =>
-      this.em.create(Comment, {
-        content: faker.lorem.sentence(),
+    const comments: Comment[] = [];
+    for (let i = 0; i < count; i++) {
+      const comment = this.em.create(Comment, {
+        content: faker.lorem.paragraph(),
         createdAt: new Date(),
-        user,
-        post,
+        user: targetUser,
+        post: targetPost,
         ...rest,
-      }),
-    );
+      });
+      comments.push(comment);
+    }
 
     await this.em.persistAndFlush(comments);
     return comments;

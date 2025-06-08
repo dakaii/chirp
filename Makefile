@@ -1,48 +1,47 @@
-.PHONY: migration-create migration-up migration-down test test-e2e build start test-clean test-build test-migrations
+.PHONY: help install dev build start stop clean logs test test-parallel test-watch migrate migrate-create seed
 
-# Development
-up:
-	DB_NAME=chirp_db docker compose up
+help: ## Show this help message
+	@echo 'Usage: make [target]'
+	@echo ''
+	@echo 'Targets:'
+	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "  %-15s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
-down:
-	docker compose down -v
+install: ## Install dependencies
+	npm install
 
-# Testing
-test-clean:
-	docker compose -f docker-compose.test.yml down -v
+dev: ## Start development server
+	docker-compose up --build
 
-test-build:
-	docker compose -f docker-compose.test.yml build
-
-test-migrations:
-	docker compose -f docker-compose.test.yml up -d test-db test-app
-	@echo "Waiting for database to be ready..."
-	@sleep 3
-	docker compose -f docker-compose.test.yml exec -T test-app npx mikro-orm migration:up
-
-test:
-	docker compose -f docker-compose.test.yml up --abort-on-container-exit --exit-code-from test-app && docker compose -f docker-compose.test.yml down -v
-
-test-rebuild: test-clean test-build test
-
-test-watch:
-	DB_NAME=chirp_test_db docker compose -f docker-compose.test.yml up --abort-on-container-exit --exit-code-from test-watch
-
-build:
+build: ## Build the application
 	docker-compose build
 
-migration-create:
-	@read -p "Enter migration name: " name; \
-	npx mikro-orm migration:create --name $$name
+start: ## Start the application
+	docker-compose up -d
 
-migration-up:
-	npx mikro-orm migration:up
+stop: ## Stop the application
+	docker-compose down
 
-migration-down:
-	npx mikro-orm migration:down
+clean: ## Clean up containers and volumes
+	docker-compose down -v --remove-orphans
+	docker system prune -f
 
-test-e2e:
-	npm run test:e2e
+logs: ## Show application logs
+	docker-compose logs -f app
 
-start:
-	npm run start:dev
+test: ## Run all tests sequentially
+	docker compose -f docker-compose.test.yml run --rm test-app npm test && docker compose -f docker-compose.test.yml down -v
+
+test-parallel: ## Run tests in parallel
+	docker compose -f docker-compose.test.yml run --rm -e TEST_PARALLEL=true test-app npm run test:parallel && docker compose -f docker-compose.test.yml down -v
+
+test-watch: ## Run tests in watch mode
+	docker-compose -f docker-compose.test.yml up test-app
+
+migrate: ## Run database migrations
+	docker-compose exec app npm run migration:run
+
+migrate-create: ## Create a new migration
+	docker-compose exec app npm run migration:create
+
+seed: ## Run database seeds
+	docker-compose exec app npm run seed

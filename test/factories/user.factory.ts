@@ -7,8 +7,8 @@ export class UserFactory {
 
   async create(data: Partial<User> = {}): Promise<User> {
     const user = this.em.create(User, {
-      username: faker.internet.userName(),
-      email: faker.internet.email(),
+      username: `${faker.internet.userName()}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      email: `${Date.now()}_${Math.random().toString(36).substr(2, 9)}@${faker.internet.domainName()}`,
       password: faker.internet.password(),
       ...data,
     });
@@ -18,14 +18,17 @@ export class UserFactory {
   }
 
   async createMany(count: number, data: Partial<User> = {}): Promise<User[]> {
-    const users = Array.from({ length: count }, () =>
-      this.em.create(User, {
-        username: faker.internet.userName(),
-        email: faker.internet.email(),
+    const users: User[] = [];
+
+    for (let i = 0; i < count; i++) {
+      const user = this.em.create(User, {
+        username: `${faker.internet.userName()}_${Date.now()}_${i}_${Math.random().toString(36).substr(2, 9)}`,
+        email: `${Date.now()}_${i}_${Math.random().toString(36).substr(2, 9)}@${faker.internet.domainName()}`,
         password: faker.internet.password(),
         ...data,
-      }),
-    );
+      });
+      users.push(user);
+    }
 
     await this.em.persistAndFlush(users);
     return users;

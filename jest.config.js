@@ -17,9 +17,6 @@ module.exports = {
   setupFilesAfterEnv: ['<rootDir>/test/setup.ts'],
   // Parallel testing configuration
   maxWorkers: process.env.TEST_PARALLEL === 'true' ? '50%' : 1,
-  // Global setup and teardown for parallel testing
-  globalSetup: '<rootDir>/test/global-setup.ts',
-  globalTeardown: '<rootDir>/test/global-teardown.ts',
   // Test timeout increased for database operations
   testTimeout: 30000,
   // Transform configuration

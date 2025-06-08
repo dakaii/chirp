@@ -1,5 +1,4 @@
 import { Options } from '@mikro-orm/core';
-import { TsMorphMetadataProvider } from '@mikro-orm/reflection';
 import { getTestWorkerEnv, logWorkerConfig } from './utils/test-config';
 
 // Get worker-specific environment variables
@@ -9,7 +8,6 @@ const testEnv = getTestWorkerEnv();
 logWorkerConfig();
 
 const config: Options = {
-  metadataProvider: TsMorphMetadataProvider,
   entities: ['./src/entities/*.entity.ts'],
   type: 'postgresql',
   dbName: testEnv.TEST_DB_NAME,

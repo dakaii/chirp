@@ -1,8 +1,6 @@
 import { Options } from '@mikro-orm/core';
-import { TsMorphMetadataProvider } from '@mikro-orm/reflection';
 
 const config: Options = {
-  metadataProvider: TsMorphMetadataProvider,
   entities:
     process.env.NODE_ENV === 'production'
       ? ['./dist/entities/*.entity.js']

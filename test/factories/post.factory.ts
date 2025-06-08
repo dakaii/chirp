@@ -7,23 +7,24 @@ export class PostFactory {
   constructor(private readonly em: EntityManager) {}
 
   async create(data: Partial<Post> & { user?: User } = {}): Promise<Post> {
-    let { user, ...rest } = data;
+    const { user, ...rest } = data;
 
-    // If no user is provided, create one in the same context
-    if (!user) {
-      user = this.em.create(User, {
-        username: faker.internet.userName(),
-        email: faker.internet.email(),
+    // Get or create user
+    let targetUser = user;
+    if (!targetUser) {
+      targetUser = this.em.create(User, {
+        username: `${faker.internet.userName()}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        email: `${Date.now()}_${Math.random().toString(36).substr(2, 9)}@${faker.internet.domainName()}`,
         password: faker.internet.password(),
       });
-      await this.em.persistAndFlush(user);
+      await this.em.persistAndFlush(targetUser);
     }
 
     const post = this.em.create(Post, {
       title: faker.lorem.sentence(),
       content: faker.lorem.paragraphs(3),
       createdAt: new Date(),
-      user,
+      user: targetUser,
       ...rest,
     });
 
@@ -35,27 +36,30 @@ export class PostFactory {
     count: number,
     data: Partial<Post> & { user?: User } = {},
   ): Promise<Post[]> {
-    let { user, ...rest } = data;
+    const { user, ...rest } = data;
 
-    // If no user is provided, create one in the same context
-    if (!user) {
-      user = this.em.create(User, {
-        username: faker.internet.userName(),
-        email: faker.internet.email(),
+    // Get or create user once for all posts
+    let targetUser = user;
+    if (!targetUser) {
+      targetUser = this.em.create(User, {
+        username: `${faker.internet.userName()}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        email: `${Date.now()}_${Math.random().toString(36).substr(2, 9)}@${faker.internet.domainName()}`,
         password: faker.internet.password(),
       });
-      await this.em.persistAndFlush(user);
+      await this.em.persistAndFlush(targetUser);
     }
 
-    const posts = Array.from({ length: count }, () =>
-      this.em.create(Post, {
+    const posts: Post[] = [];
+    for (let i = 0; i < count; i++) {
+      const post = this.em.create(Post, {
         title: faker.lorem.sentence(),
         content: faker.lorem.paragraphs(3),
         createdAt: new Date(),
-        user,
+        user: targetUser,
         ...rest,
-      }),
-    );
+      });
+      posts.push(post);
+    }
 
     await this.em.persistAndFlush(posts);
     return posts;

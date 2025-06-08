@@ -30,12 +30,12 @@ export function getTestWorkerId(): string {
  */
 export function getTestWorkerConfig(): TestWorkerConfig {
   const workerId = getTestWorkerId();
-  const basePort = parseInt(process.env.TEST_BASE_PORT || '5433', 10);
+  const basePort = parseInt(process.env.TEST_DB_PORT || '5433', 10);
   const baseAppPort = parseInt(process.env.TEST_BASE_APP_PORT || '3001', 10);
 
-  // Calculate unique ports for this worker
+  // Calculate unique app ports for this worker, but use same DB port (single container)
   const workerNum = parseInt(workerId, 10);
-  const dbPort = basePort + (workerNum - 1);
+  const dbPort = basePort; // All workers use same database container
   const appPort = baseAppPort + (workerNum - 1);
 
   return {
@@ -57,7 +57,7 @@ export function getTestWorkerEnv(): Record<string, string> {
     TEST_WORKER_ID: config.workerId,
     TEST_DB_NAME: config.dbName,
     TEST_DB_HOST: process.env.TEST_DB_HOST || 'localhost',
-    TEST_DB_PORT: config.dbPort.toString(),
+    TEST_DB_PORT: process.env.TEST_DB_PORT || config.dbPort.toString(),
     TEST_DB_USER: process.env.TEST_DB_USER || 'postgres',
     TEST_DB_PASSWORD: process.env.TEST_DB_PASSWORD || 'postgres',
     TEST_APP_PORT: config.appPort.toString(),
