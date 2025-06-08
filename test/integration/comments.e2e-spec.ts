@@ -9,6 +9,7 @@ import { User } from '../../src/entities/user.entity';
 import { CommentFactory } from '../factories/comment.factory';
 import { PostFactory } from '../factories/post.factory';
 import { UserFactory } from '../factories/user.factory';
+import { cleanDatabase } from '../utils/database';
 
 describe('CommentsController (e2e)', () => {
   let app: INestApplication;
@@ -40,12 +41,8 @@ describe('CommentsController (e2e)', () => {
   });
 
   beforeEach(async () => {
-    // Clear all data before each test
     const em = orm.em.fork();
-    await em.getConnection().execute(`
-      TRUNCATE TABLE "comment", "post", "user" RESTART IDENTITY CASCADE;
-    `);
-    await em.clear();
+    await cleanDatabase(em);
 
     // Create test user and post for each test
     testUser = await userFactory.create();

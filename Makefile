@@ -1,4 +1,4 @@
-.PHONY: migration-create migration-up migration-down test test-e2e build start test-clean
+.PHONY: migration-create migration-up migration-down test test-e2e build start test-clean test-build
 
 # Development
 up:
@@ -11,8 +11,13 @@ down:
 test-clean:
 	docker compose -f docker-compose.test.yml down -v
 
+test-build:
+	docker compose -f docker-compose.test.yml build
+
 test: test-clean
-	docker compose -f docker-compose.test.yml up --build --abort-on-container-exit
+	docker compose -f docker-compose.test.yml up --abort-on-container-exit
+
+test-rebuild: test-clean test-build test
 
 test-watch:
 	DB_NAME=chirp_test_db docker compose -f docker-compose.test.yml up --abort-on-container-exit --exit-code-from test-watch

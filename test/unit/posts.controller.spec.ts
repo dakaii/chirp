@@ -10,6 +10,7 @@ import { HttpException, HttpStatus, NotFoundException } from '@nestjs/common';
 import mikroOrmConfig from '../../src/mikro-orm.config';
 import { EntityManager } from '@mikro-orm/core';
 import { UsersService } from '../../src/services/users.service';
+import { cleanDatabase } from '../utils/database';
 
 describe('PostsController', () => {
   let controller: PostsController;
@@ -34,15 +35,14 @@ describe('PostsController', () => {
     userFactory = module.get<UserFactory>(UserFactory);
     em = module.get<EntityManager>(EntityManager);
 
+    await cleanDatabase(em);
+
     // Create a test user for each test
     testUser = await userFactory.create();
   });
 
   afterEach(async () => {
-    await em.getConnection().execute(`
-      TRUNCATE TABLE "comment", "post", "user" RESTART IDENTITY CASCADE;
-    `);
-    await em.clear();
+    await cleanDatabase(em);
   });
 
   it('should be defined', () => {
@@ -51,9 +51,6 @@ describe('PostsController', () => {
 
   describe('create', () => {
     it('should create a new post', async () => {
-      // Create a test user first
-      const testUser = await userFactory.create();
-
       const createPostDto = {
         title: 'Test Post',
         content: 'Test Content',
@@ -82,15 +79,6 @@ describe('PostsController', () => {
 
   describe('findAll', () => {
     it('should return an array of posts', async () => {
-      // Clear any existing data
-      await em.getConnection().execute(`
-        TRUNCATE TABLE "comment", "post", "user" RESTART IDENTITY CASCADE;
-      `);
-      await em.clear();
-
-      // Create a test user first
-      const testUser = await userFactory.create();
-
       // Then create posts for that user
       const posts = await postFactory.createMany(3, { user: testUser });
 

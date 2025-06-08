@@ -8,6 +8,7 @@ import { HttpException, HttpStatus, NotFoundException } from '@nestjs/common';
 import mikroOrmConfig from '../../src/mikro-orm.config';
 import { EntityManager } from '@mikro-orm/core';
 import { SerializedUser } from '../../src/entities/user.entity';
+import { cleanDatabase } from '../utils/database';
 
 describe('UsersController', () => {
   let controller: UsersController;
@@ -29,19 +30,11 @@ describe('UsersController', () => {
     userFactory = module.get<UserFactory>(UserFactory);
     em = module.get<EntityManager>(EntityManager);
 
-    // Clear all data before each test
-    await em.getConnection().execute(`
-      TRUNCATE TABLE "comment", "post", "user" RESTART IDENTITY CASCADE;
-    `);
-    await em.clear();
+    await cleanDatabase(em);
   });
 
   afterEach(async () => {
-    // Clear all data after each test
-    await em.getConnection().execute(`
-      TRUNCATE TABLE "comment", "post", "user" RESTART IDENTITY CASCADE;
-    `);
-    await em.clear();
+    await cleanDatabase(em);
   });
 
   it('should be defined', () => {
@@ -66,7 +59,7 @@ describe('UsersController', () => {
     it('should throw conflict exception for duplicate email', async () => {
       const createUserDto = {
         username: 'testuser',
-        email: 'test@example.com',
+        email: 'duplicate.test@example.com',
         password: 'password123',
       };
 
@@ -97,11 +90,7 @@ describe('UsersController', () => {
       await em.clear();
 
       // Create exactly 3 users
-      const users = await Promise.all([
-        userFactory.create(),
-        userFactory.create(),
-        userFactory.create(),
-      ]);
+      const users = await userFactory.createMany(3);
 
       const result = await controller.findAll();
 
