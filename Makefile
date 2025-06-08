@@ -21,7 +21,7 @@ test-migrations:
 	docker compose -f docker-compose.test.yml exec -T test-app npx mikro-orm migration:up
 
 test:
-	docker compose -f docker-compose.test.yml up --abort-on-container-exit --exit-code-from test-app && docker-compose.test.yml down -v
+	docker compose -f docker-compose.test.yml up --abort-on-container-exit --exit-code-from test-app && docker compose -f docker-compose.test.yml down -v
 
 test-rebuild: test-clean test-build test
 

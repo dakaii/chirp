@@ -11,14 +11,16 @@ describe('PostsController', () => {
   let context: TestContext;
   let testUser: User;
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     context = await createTestingModule();
+  });
+
+  beforeEach(async () => {
     await cleanupDatabase(context);
     testUser = await context.userFactory.create();
   });
 
-  afterEach(async () => {
-    await cleanupDatabase(context);
+  afterAll(async () => {
     await cleanupTestingModule(context);
   });
 

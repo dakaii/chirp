@@ -7,19 +7,22 @@ export class PostFactory {
   constructor(private readonly em: EntityManager) {}
 
   async create(data: Partial<Post> & { user?: User } = {}): Promise<Post> {
+    // Fork the EntityManager to avoid conflicts
+    const em = this.em.fork();
+
     let { user, ...rest } = data;
 
     // If no user is provided, create one
     if (!user) {
-      user = this.em.create(User, {
+      user = em.create(User, {
         username: faker.internet.userName(),
         email: faker.internet.email(),
         password: faker.internet.password(),
       });
-      await this.em.persistAndFlush(user);
+      await em.persistAndFlush(user);
     }
 
-    const post = this.em.create(Post, {
+    const post = em.create(Post, {
       title: faker.lorem.sentence(),
       content: faker.lorem.paragraphs(3),
       createdAt: new Date(),
@@ -27,7 +30,7 @@ export class PostFactory {
       ...rest,
     });
 
-    await this.em.persistAndFlush(post);
+    await em.persistAndFlush(post);
     return post;
   }
 
@@ -35,20 +38,23 @@ export class PostFactory {
     count: number,
     data: Partial<Post> & { user?: User } = {},
   ): Promise<Post[]> {
+    // Fork the EntityManager to avoid conflicts
+    const em = this.em.fork();
+
     let { user, ...rest } = data;
 
     // If no user is provided, create one
     if (!user) {
-      user = this.em.create(User, {
+      user = em.create(User, {
         username: faker.internet.userName(),
         email: faker.internet.email(),
         password: faker.internet.password(),
       });
-      await this.em.persistAndFlush(user);
+      await em.persistAndFlush(user);
     }
 
     const posts = Array.from({ length: count }, () =>
-      this.em.create(Post, {
+      em.create(Post, {
         title: faker.lorem.sentence(),
         content: faker.lorem.paragraphs(3),
         createdAt: new Date(),
@@ -57,7 +63,7 @@ export class PostFactory {
       }),
     );
 
-    await this.em.persistAndFlush(posts);
+    await em.persistAndFlush(posts);
     return posts;
   }
 }

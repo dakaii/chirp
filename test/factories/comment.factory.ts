@@ -10,30 +10,33 @@ export class CommentFactory {
   async create(
     data: Partial<Comment> & { user?: User; post?: Post } = {},
   ): Promise<Comment> {
+    // Fork the EntityManager to avoid conflicts
+    const em = this.em.fork();
+
     let { user, post, ...rest } = data;
 
     // If no user is provided, create one
     if (!user) {
-      user = this.em.create(User, {
+      user = em.create(User, {
         username: faker.internet.userName(),
         email: faker.internet.email(),
         password: faker.internet.password(),
       });
-      await this.em.persistAndFlush(user);
+      await em.persistAndFlush(user);
     }
 
     // If no post is provided, create one (with the user)
     if (!post) {
-      post = this.em.create(Post, {
+      post = em.create(Post, {
         title: faker.lorem.sentence(),
         content: faker.lorem.paragraphs(3),
         createdAt: new Date(),
         user,
       });
-      await this.em.persistAndFlush(post);
+      await em.persistAndFlush(post);
     }
 
-    const comment = this.em.create(Comment, {
+    const comment = em.create(Comment, {
       content: faker.lorem.paragraph(),
       createdAt: new Date(),
       user,
@@ -41,7 +44,7 @@ export class CommentFactory {
       ...rest,
     });
 
-    await this.em.persistAndFlush(comment);
+    await em.persistAndFlush(comment);
     return comment;
   }
 
@@ -49,31 +52,34 @@ export class CommentFactory {
     count: number,
     data: Partial<Comment> & { user?: User; post?: Post } = {},
   ): Promise<Comment[]> {
+    // Fork the EntityManager to avoid conflicts
+    const em = this.em.fork();
+
     let { user, post, ...rest } = data;
 
     // If no user is provided, create one
     if (!user) {
-      user = this.em.create(User, {
+      user = em.create(User, {
         username: faker.internet.userName(),
         email: faker.internet.email(),
         password: faker.internet.password(),
       });
-      await this.em.persistAndFlush(user);
+      await em.persistAndFlush(user);
     }
 
     // If no post is provided, create one (with the user)
     if (!post) {
-      post = this.em.create(Post, {
+      post = em.create(Post, {
         title: faker.lorem.sentence(),
         content: faker.lorem.paragraphs(3),
         createdAt: new Date(),
         user,
       });
-      await this.em.persistAndFlush(post);
+      await em.persistAndFlush(post);
     }
 
     const comments = Array.from({ length: count }, () =>
-      this.em.create(Comment, {
+      em.create(Comment, {
         content: faker.lorem.paragraph(),
         createdAt: new Date(),
         user,
@@ -82,7 +88,7 @@ export class CommentFactory {
       }),
     );
 
-    await this.em.persistAndFlush(comments);
+    await em.persistAndFlush(comments);
     return comments;
   }
 }

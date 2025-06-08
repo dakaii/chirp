@@ -6,20 +6,26 @@ export class UserFactory {
   constructor(private readonly em: EntityManager) {}
 
   async create(data: Partial<User> = {}): Promise<User> {
-    const user = this.em.create(User, {
+    // Fork the EntityManager to avoid conflicts
+    const em = this.em.fork();
+
+    const user = em.create(User, {
       username: faker.internet.userName(),
       email: faker.internet.email(),
       password: faker.internet.password(),
       ...data,
     });
 
-    await this.em.persistAndFlush(user);
+    await em.persistAndFlush(user);
     return user;
   }
 
   async createMany(count: number, data: Partial<User> = {}): Promise<User[]> {
+    // Fork the EntityManager to avoid conflicts
+    const em = this.em.fork();
+
     const users = Array.from({ length: count }, () =>
-      this.em.create(User, {
+      em.create(User, {
         username: faker.internet.userName(),
         email: faker.internet.email(),
         password: faker.internet.password(),
@@ -27,7 +33,7 @@ export class UserFactory {
       }),
     );
 
-    await this.em.persistAndFlush(users);
+    await em.persistAndFlush(users);
     return users;
   }
 }

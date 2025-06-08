@@ -9,13 +9,15 @@ import {
 describe('UsersController (Integration)', () => {
   let context: TestContext;
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     context = await createTestingModule();
+  });
+
+  beforeEach(async () => {
     await cleanupDatabase(context);
   });
 
-  afterEach(async () => {
-    await cleanupDatabase(context);
+  afterAll(async () => {
     await cleanupTestingModule(context);
   });
 
