@@ -4,38 +4,46 @@ import { UsersService } from '../../src/services/users.service';
 import { MikroOrmModule } from '@mikro-orm/nestjs';
 import { User } from '../../src/entities/user.entity';
 import { UserFactory } from '../factories/user.factory';
-import { HttpException, HttpStatus } from '@nestjs/common';
+import { HttpException, HttpStatus, NotFoundException } from '@nestjs/common';
+import mikroOrmConfig from '../../src/mikro-orm.config';
+import { EntityManager } from '@mikro-orm/core';
+import { SerializedUser } from '../../src/entities/user.entity';
 
 describe('UsersController', () => {
   let controller: UsersController;
   let userFactory: UserFactory;
-  let module: TestingModule;
+  let em: EntityManager;
 
   beforeEach(async () => {
-    module = await Test.createTestingModule({
+    process.env.NODE_ENV = 'test';
+    const module: TestingModule = await Test.createTestingModule({
       imports: [
-        MikroOrmModule.forRoot({
-          type: 'postgresql',
-          dbName: process.env.DB_NAME || 'chirp_test_db',
-          host: process.env.DB_HOST || 'localhost',
-          port: +(process.env.DB_PORT || 5432),
-          user: process.env.DB_USER || 'postgres',
-          password: process.env.DB_PASSWORD || 'postgres',
-          entities: [User],
-        }),
+        MikroOrmModule.forRoot(mikroOrmConfig),
         MikroOrmModule.forFeature([User]),
       ],
       controllers: [UsersController],
-      providers: [UsersService],
+      providers: [UsersService, UserFactory],
     }).compile();
 
     controller = module.get<UsersController>(UsersController);
-    const em = module.get('EntityManager');
-    userFactory = new UserFactory(em);
+    userFactory = module.get<UserFactory>(UserFactory);
+    em = module.get<EntityManager>(EntityManager);
+
+    // Clear all data before each test
+    await em.nativeDelete(User, {});
+    await em.flush();
+    await em.clear();
   });
 
   afterEach(async () => {
-    await module.close();
+    // Clear all data after each test
+    await em.nativeDelete(User, {});
+    await em.flush();
+    await em.clear();
+  });
+
+  it('should be defined', () => {
+    expect(controller).toBeDefined();
   });
 
   describe('create', () => {
@@ -46,10 +54,11 @@ describe('UsersController', () => {
         password: 'password123',
       };
 
-      const user = await controller.create(createUserDto);
-      expect(user).toBeDefined();
-      expect(user.username).toBe(createUserDto.username);
-      expect(user.email).toBe(createUserDto.email);
+      const result = await controller.create(createUserDto);
+      expect(result).toBeDefined();
+      expect(result.username).toBe(createUserDto.username);
+      expect(result.email).toBe(createUserDto.email);
+      expect((result as any).password).toBeUndefined();
     });
 
     it('should throw conflict exception for duplicate email', async () => {
@@ -72,22 +81,27 @@ describe('UsersController', () => {
 
   describe('findAll', () => {
     it('should return an array of users', async () => {
-      await userFactory.createMany(3);
+      const users = await userFactory.createMany(3);
       const result = await controller.findAll();
-      expect(result).toHaveLength(3);
+
+      expect(result).toHaveLength(users.length);
+      expect((result[0] as any).password).toBeUndefined();
     });
   });
 
   describe('findOne', () => {
     it('should return a user by id', async () => {
       const user = await userFactory.create();
-      const result = await controller.findOne(String(user.id));
+      const result = await controller.findOne(user.id.toString());
+
+      expect(result).toBeDefined();
       expect(result.id).toBe(user.id);
+      expect((result as any).password).toBeUndefined();
     });
 
     it('should throw not found exception for non-existent user', async () => {
       await expect(controller.findOne('999')).rejects.toThrow(
-        new HttpException('User not found', HttpStatus.NOT_FOUND),
+        new NotFoundException('User with ID 999 not found'),
       );
     });
   });
@@ -95,30 +109,33 @@ describe('UsersController', () => {
   describe('update', () => {
     it('should update a user', async () => {
       const user = await userFactory.create();
-      const updateUserDto = { username: 'updated' };
-      const result = await controller.update(String(user.id), updateUserDto);
-      expect(result.username).toBe('updated');
+      const updateUserDto = { username: 'updateduser' };
+
+      const result = await controller.update(user.id.toString(), updateUserDto);
+
+      expect(result).toBeDefined();
+      expect(result.username).toBe(updateUserDto.username);
+      expect((result as any).password).toBeUndefined();
     });
 
     it('should throw not found exception for non-existent user', async () => {
       await expect(
-        controller.update('999', { username: 'updated' }),
-      ).rejects.toThrow(
-        new HttpException('User not found', HttpStatus.NOT_FOUND),
-      );
+        controller.update('999', { username: 'updateduser' }),
+      ).rejects.toThrow(new NotFoundException('User with ID 999 not found'));
     });
   });
 
   describe('remove', () => {
     it('should delete a user', async () => {
       const user = await userFactory.create();
-      const result = await controller.remove(String(user.id));
-      expect(result.message).toBe('User deleted successfully');
+      const result = await controller.remove(user.id.toString());
+
+      expect(result).toEqual({ message: 'User deleted successfully' });
     });
 
     it('should throw not found exception for non-existent user', async () => {
       await expect(controller.remove('999')).rejects.toThrow(
-        new HttpException('User not found', HttpStatus.NOT_FOUND),
+        new NotFoundException('User with ID 999 not found'),
       );
     });
   });

@@ -17,10 +17,10 @@ export class Post {
   @Property()
   title!: string;
 
-  @Property({ type: 'text' })
+  @Property()
   content!: string;
 
-  @Property({ type: 'timestamp', defaultRaw: 'CURRENT_TIMESTAMP' })
+  @Property()
   createdAt: Date = new Date();
 
   @ManyToOne(() => User)

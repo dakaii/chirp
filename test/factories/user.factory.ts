@@ -1,7 +1,9 @@
+import { Injectable } from '@nestjs/common';
 import { EntityManager } from '@mikro-orm/core';
 import { User } from '../../src/entities/user.entity';
 import { faker } from '@faker-js/faker';
 
+@Injectable()
 export class UserFactory {
   constructor(private readonly em: EntityManager) {}
 

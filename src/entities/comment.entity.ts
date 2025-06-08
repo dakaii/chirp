@@ -7,11 +7,11 @@ export class Comment {
   @PrimaryKey()
   id!: number;
 
-  @Property({ type: 'text' })
+  @Property()
   content!: string;
 
-  @Property({ onCreate: () => new Date() })
-  createdAt!: Date;
+  @Property()
+  createdAt: Date = new Date();
 
   @ManyToOne(() => Post)
   post!: Post;

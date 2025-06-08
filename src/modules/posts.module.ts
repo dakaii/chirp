@@ -1,12 +1,13 @@
 import { Module } from '@nestjs/common';
 import { MikroOrmModule } from '@mikro-orm/nestjs';
-import { PostsService } from '../services/posts.service';
-import { PostsController } from '../controllers/posts.controller';
 import { Post } from '../entities/post.entity';
+import { User } from '../entities/user.entity';
+import { PostsController } from '../controllers/posts.controller';
+import { PostsService } from '../services/posts.service';
 import { UsersModule } from './users.module';
 
 @Module({
-  imports: [MikroOrmModule.forFeature([Post]), UsersModule],
+  imports: [MikroOrmModule.forFeature([Post, User]), UsersModule],
   controllers: [PostsController],
   providers: [PostsService],
   exports: [PostsService],

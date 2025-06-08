@@ -1,18 +1,21 @@
+import { Injectable } from '@nestjs/common';
 import { EntityManager } from '@mikro-orm/core';
 import { Post } from '../../src/entities/post.entity';
 import { User } from '../../src/entities/user.entity';
 import { faker } from '@faker-js/faker';
 
+@Injectable()
 export class PostFactory {
   constructor(private readonly em: EntityManager) {}
 
-  async create(user: User, partial: Partial<Post> = {}): Promise<Post> {
+  async create(partial: Partial<Post> & { user: User }): Promise<Post> {
+    const { user, ...rest } = partial;
     const post = this.em.create(Post, {
-      title: partial.title || faker.lorem.sentence(),
-      content: partial.content || faker.lorem.paragraphs(),
-      user,
+      title: rest.title || faker.lorem.sentence(),
+      content: rest.content || faker.lorem.paragraphs(),
       createdAt: new Date(),
-      ...partial,
+      user,
+      ...rest,
     });
 
     await this.em.persistAndFlush(post);
@@ -20,13 +23,12 @@ export class PostFactory {
   }
 
   async createMany(
-    user: User,
     count: number,
-    partial: Partial<Post> = {},
+    partial: Partial<Post> & { user: User },
   ): Promise<Post[]> {
     const posts: Post[] = [];
     for (let i = 0; i < count; i++) {
-      posts.push(await this.create(user, partial));
+      posts.push(await this.create(partial));
     }
     return posts;
   }

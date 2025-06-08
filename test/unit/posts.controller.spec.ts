@@ -1,49 +1,52 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { PostsController } from '../../src/controllers/posts.controller';
 import { PostsService } from '../../src/services/posts.service';
-import { UsersService } from '../../src/services/users.service';
 import { MikroOrmModule } from '@mikro-orm/nestjs';
 import { Post } from '../../src/entities/post.entity';
 import { User } from '../../src/entities/user.entity';
 import { PostFactory } from '../factories/post.factory';
 import { UserFactory } from '../factories/user.factory';
-import { HttpException, HttpStatus } from '@nestjs/common';
+import { HttpException, HttpStatus, NotFoundException } from '@nestjs/common';
+import mikroOrmConfig from '../../src/mikro-orm.config';
+import { EntityManager } from '@mikro-orm/core';
+import { UsersService } from '../../src/services/users.service';
 
 describe('PostsController', () => {
   let controller: PostsController;
   let postFactory: PostFactory;
   let userFactory: UserFactory;
-  let module: TestingModule;
+  let em: EntityManager;
   let testUser: User;
 
   beforeEach(async () => {
-    module = await Test.createTestingModule({
+    process.env.NODE_ENV = 'test';
+    const module: TestingModule = await Test.createTestingModule({
       imports: [
-        MikroOrmModule.forRoot({
-          type: 'postgresql',
-          dbName: process.env.DB_NAME || 'chirp_test_db',
-          host: process.env.DB_HOST || 'localhost',
-          port: +(process.env.DB_PORT || 5432),
-          user: process.env.DB_USER || 'postgres',
-          password: process.env.DB_PASSWORD || 'postgres',
-          entities: [Post, User],
-        }),
+        MikroOrmModule.forRoot(mikroOrmConfig),
         MikroOrmModule.forFeature([Post, User]),
       ],
       controllers: [PostsController],
-      providers: [PostsService, UsersService],
+      providers: [PostsService, PostFactory, UserFactory, UsersService],
     }).compile();
 
     controller = module.get<PostsController>(PostsController);
-    const em = module.get('EntityManager');
-    postFactory = new PostFactory(em);
-    userFactory = new UserFactory(em);
+    postFactory = module.get<PostFactory>(PostFactory);
+    userFactory = module.get<UserFactory>(UserFactory);
+    em = module.get<EntityManager>(EntityManager);
 
+    // Create a test user for each test
     testUser = await userFactory.create();
   });
 
   afterEach(async () => {
-    await module.close();
+    await em.nativeDelete(Post, {});
+    await em.nativeDelete(User, {});
+    await em.flush();
+    await em.clear();
+  });
+
+  it('should be defined', () => {
+    expect(controller).toBeDefined();
   });
 
   describe('create', () => {
@@ -54,11 +57,11 @@ describe('PostsController', () => {
         userId: testUser.id,
       };
 
-      const post = await controller.create(createPostDto);
-      expect(post).toBeDefined();
-      expect(post.title).toBe(createPostDto.title);
-      expect(post.content).toBe(createPostDto.content);
-      expect(post.user.id).toBe(testUser.id);
+      const result = await controller.create(createPostDto);
+      expect(result).toBeDefined();
+      expect(result.title).toBe(createPostDto.title);
+      expect(result.content).toBe(createPostDto.content);
+      expect(result.user.id).toBe(testUser.id);
     });
 
     it('should throw not found exception for non-existent user', async () => {
@@ -69,77 +72,68 @@ describe('PostsController', () => {
       };
 
       await expect(controller.create(createPostDto)).rejects.toThrow(
-        new HttpException('User not found', HttpStatus.NOT_FOUND),
+        new NotFoundException('User not found'),
       );
     });
   });
 
   describe('findAll', () => {
     it('should return an array of posts', async () => {
-      await postFactory.createMany(testUser, 3);
+      const posts = await postFactory.createMany(3, { user: testUser });
       const result = await controller.findAll();
-      expect(result).toHaveLength(3);
+
+      expect(result).toHaveLength(posts.length);
+      expect(result[0].user.id).toBe(testUser.id);
     });
   });
 
   describe('findOne', () => {
     it('should return a post by id', async () => {
-      const post = await postFactory.create(testUser);
-      const result = await controller.findOne(String(post.id));
+      const post = await postFactory.create({ user: testUser });
+      const result = await controller.findOne(post.id.toString());
+
+      expect(result).toBeDefined();
       expect(result.id).toBe(post.id);
+      expect(result.user.id).toBe(testUser.id);
     });
 
     it('should throw not found exception for non-existent post', async () => {
       await expect(controller.findOne('999')).rejects.toThrow(
-        new HttpException('Post not found', HttpStatus.NOT_FOUND),
-      );
-    });
-  });
-
-  describe('findByUser', () => {
-    it('should return posts for a specific user', async () => {
-      await postFactory.createMany(testUser, 3);
-      const result = await controller.findByUser(String(testUser.id));
-      expect(result).toHaveLength(3);
-      result.forEach((post) => {
-        expect(post.user.id).toBe(testUser.id);
-      });
-    });
-
-    it('should throw not found exception for non-existent user', async () => {
-      await expect(controller.findByUser('999')).rejects.toThrow(
-        new HttpException('User not found', HttpStatus.NOT_FOUND),
+        new NotFoundException('Post with ID 999 not found'),
       );
     });
   });
 
   describe('update', () => {
     it('should update a post', async () => {
-      const post = await postFactory.create(testUser);
+      const post = await postFactory.create({ user: testUser });
       const updatePostDto = { title: 'Updated Title' };
-      const result = await controller.update(String(post.id), updatePostDto);
-      expect(result.title).toBe('Updated Title');
+
+      const result = await controller.update(post.id.toString(), updatePostDto);
+
+      expect(result).toBeDefined();
+      expect(result.title).toBe(updatePostDto.title);
+      expect(result.user.id).toBe(testUser.id);
     });
 
     it('should throw not found exception for non-existent post', async () => {
       await expect(
         controller.update('999', { title: 'Updated Title' }),
-      ).rejects.toThrow(
-        new HttpException('Post not found', HttpStatus.NOT_FOUND),
-      );
+      ).rejects.toThrow(new NotFoundException('Post with ID 999 not found'));
     });
   });
 
   describe('remove', () => {
     it('should delete a post', async () => {
-      const post = await postFactory.create(testUser);
-      const result = await controller.remove(String(post.id));
-      expect(result.message).toBe('Post deleted successfully');
+      const post = await postFactory.create({ user: testUser });
+      const result = await controller.remove(post.id.toString());
+
+      expect(result).toEqual({ message: 'Post deleted successfully' });
     });
 
     it('should throw not found exception for non-existent post', async () => {
       await expect(controller.remove('999')).rejects.toThrow(
-        new HttpException('Post not found', HttpStatus.NOT_FOUND),
+        new NotFoundException('Post with ID 999 not found'),
       );
     });
   });

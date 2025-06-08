@@ -93,7 +93,7 @@ describe('PostsController (e2e)', () => {
 
   describe('GET /posts', () => {
     it('should return an array of posts', async () => {
-      await postFactory.createMany(testUser, 3);
+      await postFactory.createMany(3, { user: testUser });
 
       return request(app.getHttpServer())
         .get('/posts')
@@ -111,7 +111,7 @@ describe('PostsController (e2e)', () => {
 
   describe('GET /posts/:id', () => {
     it('should return a post by id', async () => {
-      const post = await postFactory.create(testUser);
+      const post = await postFactory.create({ user: testUser });
 
       return request(app.getHttpServer())
         .get(`/posts/${post.id}`)
@@ -131,7 +131,7 @@ describe('PostsController (e2e)', () => {
 
   describe('GET /posts/user/:userId', () => {
     it('should return posts for a specific user', async () => {
-      await postFactory.createMany(testUser, 3);
+      await postFactory.createMany(3, { user: testUser });
 
       return request(app.getHttpServer())
         .get(`/posts/user/${testUser.id}`)
@@ -152,7 +152,7 @@ describe('PostsController (e2e)', () => {
 
   describe('PATCH /posts/:id', () => {
     it('should update a post', async () => {
-      const post = await postFactory.create(testUser);
+      const post = await postFactory.create({ user: testUser });
 
       return request(app.getHttpServer())
         .patch(`/posts/${post.id}`)
@@ -179,7 +179,7 @@ describe('PostsController (e2e)', () => {
 
   describe('DELETE /posts/:id', () => {
     it('should delete a post', async () => {
-      const post = await postFactory.create(testUser);
+      const post = await postFactory.create({ user: testUser });
 
       return request(app.getHttpServer())
         .delete(`/posts/${post.id}`)

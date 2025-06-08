@@ -6,8 +6,10 @@ import {
   Patch,
   Param,
   Delete,
-  HttpException,
   HttpStatus,
+  HttpException,
+  HttpCode,
+  NotFoundException,
 } from '@nestjs/common';
 import { PostsService } from '../services/posts.service';
 import { CreatePostDto } from '../dto/create-post.dto';
@@ -22,15 +24,14 @@ export class PostsController {
   ) {}
 
   @Post()
-  async create(@Body() createPostDto: CreatePostDto & { userId: number }) {
-    const user = await this.usersService.findOne(createPostDto.userId);
-    if (!user) {
-      throw new HttpException('User not found', HttpStatus.NOT_FOUND);
-    }
-
+  async create(@Body() createPostDto: CreatePostDto) {
     try {
-      return await this.postsService.create(createPostDto, user);
+      const post = await this.postsService.create(createPostDto);
+      return post;
     } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
       throw new HttpException(
         'Could not create post',
         HttpStatus.INTERNAL_SERVER_ERROR,
@@ -47,7 +48,7 @@ export class PostsController {
   async findOne(@Param('id') id: string) {
     const post = await this.postsService.findOne(+id);
     if (!post) {
-      throw new HttpException('Post not found', HttpStatus.NOT_FOUND);
+      throw new NotFoundException(`Post with ID ${id} not found`);
     }
     return post;
   }
@@ -65,16 +66,17 @@ export class PostsController {
   async update(@Param('id') id: string, @Body() updatePostDto: UpdatePostDto) {
     const post = await this.postsService.update(+id, updatePostDto);
     if (!post) {
-      throw new HttpException('Post not found', HttpStatus.NOT_FOUND);
+      throw new NotFoundException(`Post with ID ${id} not found`);
     }
     return post;
   }
 
   @Delete(':id')
+  @HttpCode(HttpStatus.OK)
   async remove(@Param('id') id: string) {
-    const deleted = await this.postsService.remove(+id);
-    if (!deleted) {
-      throw new HttpException('Post not found', HttpStatus.NOT_FOUND);
+    const success = await this.postsService.remove(+id);
+    if (!success) {
+      throw new NotFoundException(`Post with ID ${id} not found`);
     }
     return { message: 'Post deleted successfully' };
   }

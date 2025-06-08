@@ -48,7 +48,7 @@ describe('CommentsController (e2e)', () => {
 
     // Create test user and post for each test
     testUser = await userFactory.create();
-    testPost = await postFactory.create(testUser);
+    testPost = await postFactory.create({ user: testUser });
   });
 
   afterAll(async () => {

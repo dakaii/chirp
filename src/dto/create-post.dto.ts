@@ -3,12 +3,12 @@ import { IsString, IsNotEmpty, IsNumber } from 'class-validator';
 export class CreatePostDto {
   @IsString()
   @IsNotEmpty()
-  title: string;
+  title!: string;
 
   @IsString()
   @IsNotEmpty()
-  content: string;
+  content!: string;
 
   @IsNumber()
-  userId: number;
+  userId!: number;
 }

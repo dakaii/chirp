@@ -8,6 +8,8 @@ import {
 import { Post } from './post.entity';
 import { Comment } from './comment.entity';
 
+export type SerializedUser = Omit<User, 'password' | 'toJSON'>;
+
 @Entity()
 export class User {
   @PrimaryKey()
@@ -19,7 +21,7 @@ export class User {
   @Property({ unique: true })
   email!: string;
 
-  @Property()
+  @Property({ hidden: true })
   password!: string;
 
   @OneToMany(() => Post, (post) => post.user)
@@ -27,4 +29,9 @@ export class User {
 
   @OneToMany(() => Comment, (comment) => comment.user)
   comments = new Collection<Comment>(this);
+
+  toJSON(): SerializedUser {
+    const { password, ...json } = this;
+    return json;
+  }
 }
