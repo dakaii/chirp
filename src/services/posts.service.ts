@@ -47,7 +47,7 @@ export class PostsService {
   }
 
   async update(id: number, updatePostDto: UpdatePostDto): Promise<Post | null> {
-    const post = await this.postRepository.findOne(id);
+    const post = await this.postRepository.findOne(id, { populate: ['user'] });
     if (!post) return null;
 
     this.postRepository.assign(post, updatePostDto);

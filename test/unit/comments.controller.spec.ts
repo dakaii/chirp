@@ -71,50 +71,6 @@ describe('CommentsController', () => {
     });
   });
 
-  describe('findByPost', () => {
-    it('should return an array of comments for a post', async () => {
-      const comments = await context.commentFactory.createMany(3, {
-        post: testPost,
-        user: testUser,
-      });
-
-      const result = await context.commentsController.findByPost(
-        testPost.id.toString(),
-      );
-
-      expect(result).toHaveLength(comments.length);
-      expect(result[0].post.id).toBe(testPost.id);
-    });
-
-    it('should return empty array for non-existent post', async () => {
-      await expect(
-        context.commentsController.findByPost('999'),
-      ).rejects.toThrow(new NotFoundException('Post with ID 999 not found'));
-    });
-  });
-
-  describe('findByUser', () => {
-    it('should return an array of comments for a user', async () => {
-      const comments = await context.commentFactory.createMany(3, {
-        post: testPost,
-        user: testUser,
-      });
-
-      const result = await context.commentsController.findByUser(
-        testUser.id.toString(),
-      );
-
-      expect(result).toHaveLength(comments.length);
-      expect(result[0].user.id).toBe(testUser.id);
-    });
-
-    it('should return empty array for non-existent user', async () => {
-      await expect(
-        context.commentsController.findByUser('999'),
-      ).rejects.toThrow(new NotFoundException('User with ID 999 not found'));
-    });
-  });
-
   describe('findOne', () => {
     it('should return a comment by id', async () => {
       const comment = await context.commentFactory.create({

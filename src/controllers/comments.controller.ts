@@ -24,18 +24,6 @@ export class CommentsController {
     return comment;
   }
 
-  @Get('post/:postId')
-  async findByPost(@Param('postId') postId: string) {
-    const comments = await this.commentsService.findByPost(+postId);
-    return comments;
-  }
-
-  @Get('user/:userId')
-  async findByUser(@Param('userId') userId: string) {
-    const comments = await this.commentsService.findByUser(+userId);
-    return comments;
-  }
-
   @Get(':id')
   async findOne(@Param('id') id: string) {
     const comment = await this.commentsService.findOne(+id);
@@ -58,7 +46,7 @@ export class CommentsController {
   }
 
   @Delete(':id')
-  @HttpCode(HttpStatus.OK)
+  @HttpCode(HttpStatus.NO_CONTENT)
   async remove(@Param('id') id: string) {
     const comment = await this.commentsService.remove(+id);
     if (!comment) {

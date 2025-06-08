@@ -1,3 +1,5 @@
+import { Test, TestingModule } from '@nestjs/testing';
+import { INestApplication } from '@nestjs/common';
 import * as request from 'supertest';
 import { User } from '../../src/entities/user.entity';
 import { Post } from '../../src/entities/post.entity';
@@ -69,7 +71,7 @@ describe('CommentsController (e2e)', () => {
     });
   });
 
-  describe('GET /comments/by-post/:postId', () => {
+  describe('GET /posts/:id/comments', () => {
     it('should return all comments for a post', async () => {
       await context.commentFactory.createMany(2, {
         user: testUser,
@@ -77,7 +79,7 @@ describe('CommentsController (e2e)', () => {
       });
 
       const response = await request(context.app.getHttpServer()).get(
-        `/comments/by-post/${testPost.id}`,
+        `/posts/${testPost.id}/comments`,
       );
 
       expect(response.status).toBe(200);
@@ -90,7 +92,7 @@ describe('CommentsController (e2e)', () => {
 
     it('should return empty array if post has no comments', async () => {
       const response = await request(context.app.getHttpServer()).get(
-        `/comments/by-post/${testPost.id}`,
+        `/posts/${testPost.id}/comments`,
       );
 
       expect(response.status).toBe(200);
@@ -99,14 +101,14 @@ describe('CommentsController (e2e)', () => {
 
     it('should return 404 if post not found', async () => {
       const response = await request(context.app.getHttpServer()).get(
-        '/comments/by-post/999',
+        '/posts/999/comments',
       );
 
       expect(response.status).toBe(404);
     });
   });
 
-  describe('GET /comments/by-user/:userId', () => {
+  describe('GET /users/:id/comments', () => {
     it('should return all comments by a user', async () => {
       await context.commentFactory.createMany(2, {
         user: testUser,
@@ -114,7 +116,7 @@ describe('CommentsController (e2e)', () => {
       });
 
       const response = await request(context.app.getHttpServer()).get(
-        `/comments/by-user/${testUser.id}`,
+        `/users/${testUser.id}/comments`,
       );
 
       expect(response.status).toBe(200);
@@ -127,7 +129,7 @@ describe('CommentsController (e2e)', () => {
 
     it('should return empty array if user has no comments', async () => {
       const response = await request(context.app.getHttpServer()).get(
-        `/comments/by-user/${testUser.id}`,
+        `/users/${testUser.id}/comments`,
       );
 
       expect(response.status).toBe(200);
@@ -136,7 +138,7 @@ describe('CommentsController (e2e)', () => {
 
     it('should return 404 if user not found', async () => {
       const response = await request(context.app.getHttpServer()).get(
-        '/comments/by-user/999',
+        '/users/999/comments',
       );
 
       expect(response.status).toBe(404);
@@ -191,7 +193,7 @@ describe('CommentsController (e2e)', () => {
       expect(response.status).toBe(204);
 
       const getResponse = await request(context.app.getHttpServer()).get(
-        `/comments/by-post/${testPost.id}`,
+        `/posts/${testPost.id}/comments`,
       );
       expect(getResponse.body).toHaveLength(0);
     });

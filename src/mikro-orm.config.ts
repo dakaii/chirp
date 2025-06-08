@@ -14,6 +14,8 @@ const config: Options = {
   user: process.env.DB_USER || 'postgres',
   password: process.env.DB_PASSWORD || 'postgres',
   debug: process.env.NODE_ENV === 'development',
+  allowGlobalContext:
+    process.env.NODE_ENV === 'test' || process.env.JEST_WORKER_ID !== undefined,
   migrations: {
     path: './migrations',
     glob: '!(*.d).{js,ts}',

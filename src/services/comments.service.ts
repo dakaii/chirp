@@ -41,7 +41,7 @@ export class CommentsService {
       throw new NotFoundException(`Post with ID ${postId} not found`);
     }
 
-    return this.em.find(Comment, { post }, { populate: ['user'] });
+    return this.em.find(Comment, { post }, { populate: ['user', 'post'] });
   }
 
   async findByUser(userId: number): Promise<Comment[]> {
@@ -50,7 +50,7 @@ export class CommentsService {
       throw new NotFoundException(`User with ID ${userId} not found`);
     }
 
-    return this.em.find(Comment, { user }, { populate: ['post'] });
+    return this.em.find(Comment, { user }, { populate: ['post', 'user'] });
   }
 
   async findOne(id: number): Promise<Comment | null> {
@@ -61,7 +61,11 @@ export class CommentsService {
     id: number,
     updateCommentDto: UpdateCommentDto,
   ): Promise<Comment | null> {
-    const comment = await this.em.findOne(Comment, { id });
+    const comment = await this.em.findOne(
+      Comment,
+      { id },
+      { populate: ['user', 'post'] },
+    );
     if (!comment) {
       return null;
     }

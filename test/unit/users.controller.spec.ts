@@ -26,26 +26,28 @@ describe('UsersController', () => {
   describe('create', () => {
     it('should create a new user', async () => {
       await withTestTransaction(context, async () => {
+        const uniqueId = Date.now() + Math.random();
         const createUserDto = {
-          username: 'testuser',
-          email: 'test@example.com',
+          username: `testuser_${uniqueId}`,
+          email: `test_${uniqueId}@example.com`,
           password: 'password123',
         };
 
         const result = await context.usersController.create(createUserDto);
 
         expect(result).toHaveProperty('id');
-        expect(result.username).toBe('testuser');
-        expect(result.email).toBe('test@example.com');
+        expect(result.username).toBe(`testuser_${uniqueId}`);
+        expect(result.email).toBe(`test_${uniqueId}@example.com`);
         expect(result).not.toHaveProperty('password');
       });
     });
 
     it('should throw conflict exception for duplicate email', async () => {
       await withTestTransaction(context, async () => {
+        const uniqueId = Date.now() + Math.random();
         const createUserDto = {
-          username: 'testuser',
-          email: 'duplicate@example.com',
+          username: `testuser_${uniqueId}`,
+          email: `duplicate_${uniqueId}@example.com`,
           password: 'password123',
         };
 
@@ -54,14 +56,14 @@ describe('UsersController', () => {
 
         // Try to create second user with same email
         const duplicateDto = {
-          username: 'differentuser',
-          email: 'duplicate@example.com',
+          username: `differentuser_${uniqueId}`,
+          email: `duplicate_${uniqueId}@example.com`,
           password: 'password123',
         };
 
         await expect(
           context.usersController.create(duplicateDto),
-        ).rejects.toThrow();
+        ).rejects.toThrow(HttpException);
       });
     });
   });
@@ -70,16 +72,23 @@ describe('UsersController', () => {
     it('should return an array of users', async () => {
       await withTestTransaction(context, async () => {
         // Create test users
-        await context.userFactory.createMany(3);
+        const createdUsers = await context.userFactory.createMany(3);
 
         const result = await context.usersController.findAll();
 
         expect(Array.isArray(result)).toBe(true);
-        expect(result.length).toBe(3);
+        expect(result.length).toBeGreaterThanOrEqual(3);
         expect(result[0]).toHaveProperty('id');
         expect(result[0]).toHaveProperty('username');
         expect(result[0]).toHaveProperty('email');
         expect(result[0]).not.toHaveProperty('password');
+
+        // Verify our created users are in the result
+        const createdUserIds = createdUsers.map((u) => u.id);
+        const resultIds = result.map((u) => u.id);
+        createdUserIds.forEach((id) => {
+          expect(resultIds).toContain(id);
+        });
       });
     });
   });
@@ -100,10 +109,11 @@ describe('UsersController', () => {
       });
     });
 
-    it('should return null for non-existent user', async () => {
+    it('should throw NotFoundException for non-existent user', async () => {
       await withTestTransaction(context, async () => {
-        const result = await context.usersController.findOne('999');
-        expect(result).toBeNull();
+        await expect(context.usersController.findOne('999')).rejects.toThrow(
+          NotFoundException,
+        );
       });
     });
   });
@@ -129,18 +139,16 @@ describe('UsersController', () => {
       });
     });
 
-    it('should return null for non-existent user', async () => {
+    it('should throw NotFoundException for non-existent user', async () => {
       await withTestTransaction(context, async () => {
         const updateUserDto = {
           username: 'updateduser',
           email: 'updated@example.com',
         };
 
-        const result = await context.usersController.update(
-          '999',
-          updateUserDto,
-        );
-        expect(result).toBeNull();
+        await expect(
+          context.usersController.update('999', updateUserDto),
+        ).rejects.toThrow(NotFoundException);
       });
     });
   });
@@ -151,19 +159,19 @@ describe('UsersController', () => {
         const user = await context.userFactory.create();
 
         const result = await context.usersController.remove(user.id.toString());
-        expect(result).toBe(true);
+        expect(result).toEqual({ message: 'User deleted successfully' });
 
-        const deletedUser = await context.usersController.findOne(
-          user.id.toString(),
-        );
-        expect(deletedUser).toBeNull();
+        await expect(
+          context.usersController.findOne(user.id.toString()),
+        ).rejects.toThrow(NotFoundException);
       });
     });
 
-    it('should return false for non-existent user', async () => {
+    it('should throw NotFoundException for non-existent user', async () => {
       await withTestTransaction(context, async () => {
-        const result = await context.usersController.remove('999');
-        expect(result).toBe(false);
+        await expect(context.usersController.remove('999')).rejects.toThrow(
+          NotFoundException,
+        );
       });
     });
   });

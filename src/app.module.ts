@@ -1,6 +1,5 @@
 import { Module } from '@nestjs/common';
-import { AppController } from './controllers/app.controller';
-import { AppService } from './services/app.service';
+
 import { MikroOrmModule } from '@mikro-orm/nestjs';
 import { User } from './entities/user.entity';
 import { Post } from './entities/post.entity';
@@ -17,7 +16,7 @@ import { CommentsModule } from './modules/comments.module';
     PostsModule,
     CommentsModule,
   ],
-  controllers: [AppController],
-  providers: [AppService],
+  controllers: [],
+  providers: [],
 })
 export class AppModule {}
