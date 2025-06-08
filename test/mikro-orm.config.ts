@@ -4,9 +4,8 @@ import { Options } from '@mikro-orm/core';
  * Get database configuration for current test mode
  */
 function getTestDatabaseConfig() {
-  // Check if we're in parallel mode
-  const isParallel =
-    process.env.TEST_PARALLEL === 'true' || process.env.JEST_WORKER_ID;
+  // Check if we're in parallel mode - only when explicitly enabled
+  const isParallel = process.env.TEST_PARALLEL === 'true';
 
   if (isParallel) {
     // Import parallel config only when needed

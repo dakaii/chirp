@@ -113,5 +113,9 @@ async function seedBasicEntitiesForWorker(orm: MikroORM, workerId: string) {
   }
 
   await em.persistAndFlush(users);
+
+  // Reset the auto-increment sequence to start after the seeded users
+  await em.getConnection().execute(`SELECT setval('user_id_seq', 3, true)`);
+
   console.log(`✅ Seeded ${users.length} basic users for worker ${workerId}`);
 }

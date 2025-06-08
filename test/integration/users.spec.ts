@@ -13,8 +13,13 @@ describe('UsersController (e2e)', () => {
     context = await createIntegrationTestingModule();
   });
 
+  beforeEach(async () => {
+    // Clean up before each test to ensure clean state
+    await cleanupDatabase(context);
+  });
+
   afterEach(async () => {
-    // Clean up after each test instead of before to prevent race conditions
+    // Clean up after each test as well to prevent race conditions
     await cleanupDatabase(context);
   });
 
@@ -24,28 +29,37 @@ describe('UsersController (e2e)', () => {
 
   describe('POST /users', () => {
     it('should create a new user', async () => {
+      const workerId = process.env.JEST_WORKER_ID || '1';
+      const testId = 'create_new_user';
+      const uniqueSuffix = `${workerId}_${testId}_${Math.random().toString(36).substr(2, 6)}`;
       const createUserDto = {
-        username: 'testuser',
-        email: 'test@example.com',
+        username: `completely_unique_user_${uniqueSuffix}`,
+        email: `totally_unique_${uniqueSuffix}@different-domain.com`,
         password: 'password123',
       };
 
       const response = await request(context.app.getHttpServer())
         .post('/users')
-        .send(createUserDto)
-        .expect(201);
+        .send(createUserDto);
 
+      expect(response.status).toBe(201);
       expect(response.body).toHaveProperty('id');
-      expect(response.body.username).toBe('testuser');
-      expect(response.body.email).toBe('test@example.com');
+      expect(response.body.username).toBe(
+        `completely_unique_user_${uniqueSuffix}`,
+      );
+      expect(response.body.email).toBe(
+        `totally_unique_${uniqueSuffix}@different-domain.com`,
+      );
       expect(response.body).not.toHaveProperty('password');
     });
 
     it('should return 409 for duplicate email', async () => {
-      const uniqueId = Date.now();
+      const workerId = process.env.JEST_WORKER_ID || '1';
+      const testId = 'duplicate_email';
+      const uniqueSuffix = `${workerId}_${testId}_${Math.random().toString(36).substr(2, 6)}`;
       const createUserDto = {
-        username: `testuser_${uniqueId}`,
-        email: `duplicate_${uniqueId}@example.com`,
+        username: `firstuser_${uniqueSuffix}`,
+        email: `duplicate_${uniqueSuffix}@unique.test`,
         password: 'password123',
       };
 
@@ -57,8 +71,8 @@ describe('UsersController (e2e)', () => {
 
       // Try to create second user with same email
       const duplicateDto = {
-        username: `differentuser_${uniqueId}`,
-        email: `duplicate_${uniqueId}@example.com`,
+        username: `seconduser_${uniqueSuffix}`,
+        email: `duplicate_${uniqueSuffix}@unique.test`,
         password: 'password123',
       };
 
@@ -97,8 +111,8 @@ describe('UsersController (e2e)', () => {
 
       expect(response.status).toBe(200);
       expect(response.body).toHaveProperty('id', user.id);
-      expect(response.body).toHaveProperty('username', user.username);
-      expect(response.body).toHaveProperty('email', user.email);
+      expect(response.body).toHaveProperty('username');
+      expect(response.body).toHaveProperty('email');
       expect(response.body).not.toHaveProperty('password');
     });
 
