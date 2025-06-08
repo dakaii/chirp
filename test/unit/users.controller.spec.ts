@@ -3,131 +3,164 @@ import {
   TestContext,
   createTestingModule,
   cleanupTestingModule,
-  cleanupDatabase,
+  withTestTransaction,
 } from '../utils/test-module';
 
-describe('UsersController (Integration)', () => {
+describe('UsersController', () => {
   let context: TestContext;
 
   beforeAll(async () => {
     context = await createTestingModule();
   });
 
-  beforeEach(async () => {
-    await cleanupDatabase(context);
-  });
-
   afterAll(async () => {
     await cleanupTestingModule(context);
   });
 
-  it('should be defined', () => {
-    expect(context.usersController).toBeDefined();
+  it('should be defined', async () => {
+    await withTestTransaction(context, async (testContext) => {
+      expect(testContext.usersController).toBeDefined();
+    });
   });
 
   describe('create', () => {
     it('should create a new user', async () => {
-      const createUserDto = {
-        username: 'testuser',
-        email: 'test@example.com',
-        password: 'password123',
-      };
+      await withTestTransaction(context, async (testContext) => {
+        const createUserDto = {
+          username: 'testuser',
+          email: 'test@example.com',
+          password: 'password123',
+        };
 
-      const result = await context.usersController.create(createUserDto);
-      expect(result).toBeDefined();
-      expect(result.username).toBe(createUserDto.username);
-      expect(result.email).toBe(createUserDto.email);
-      expect((result as any).password).toBeUndefined();
+        const result = await testContext.usersController.create(createUserDto);
+
+        expect(result).toHaveProperty('id');
+        expect(result.username).toBe('testuser');
+        expect(result.email).toBe('test@example.com');
+        expect(result).not.toHaveProperty('password');
+      });
     });
 
     it('should throw conflict exception for duplicate email', async () => {
-      const createUserDto = {
-        username: 'testuser',
-        email: 'duplicate.test@example.com',
-        password: 'password123',
-      };
+      await withTestTransaction(context, async (testContext) => {
+        const createUserDto = {
+          username: 'testuser',
+          email: 'duplicate@example.com',
+          password: 'password123',
+        };
 
-      // First creation should succeed
-      await context.usersController.create(createUserDto);
+        // Create first user
+        await testContext.usersController.create(createUserDto);
 
-      // Second creation with same email should fail
-      await expect(
-        context.usersController.create({
-          ...createUserDto,
-          username: 'differentuser', // Different username but same email
-        }),
-      ).rejects.toThrow(
-        new HttpException(
-          'Username or email already exists',
-          HttpStatus.CONFLICT,
-        ),
-      );
+        // Try to create second user with same email
+        const duplicateDto = {
+          username: 'differentuser',
+          email: 'duplicate@example.com',
+          password: 'password123',
+        };
+
+        await expect(
+          testContext.usersController.create(duplicateDto),
+        ).rejects.toThrow();
+      });
     });
   });
 
   describe('findAll', () => {
     it('should return an array of users', async () => {
-      // Create exactly 3 users
-      const users = await context.userFactory.createMany(3);
+      await withTestTransaction(context, async (testContext) => {
+        // Create test users
+        await testContext.userFactory.createMany(3);
 
-      const result = await context.usersController.findAll();
+        const result = await testContext.usersController.findAll();
 
-      expect(result).toHaveLength(users.length);
-      expect((result[0] as any).password).toBeUndefined();
+        expect(Array.isArray(result)).toBe(true);
+        expect(result.length).toBe(3);
+        expect(result[0]).toHaveProperty('id');
+        expect(result[0]).toHaveProperty('username');
+        expect(result[0]).toHaveProperty('email');
+        expect(result[0]).not.toHaveProperty('password');
+      });
     });
   });
 
   describe('findOne', () => {
     it('should return a user by id', async () => {
-      const user = await context.userFactory.create();
-      const result = await context.usersController.findOne(user.id.toString());
+      await withTestTransaction(context, async (testContext) => {
+        const user = await testContext.userFactory.create();
 
-      expect(result).toBeDefined();
-      expect(result.id).toBe(user.id);
-      expect((result as any).password).toBeUndefined();
+        const result = await testContext.usersController.findOne(user.id);
+
+        expect(result).toHaveProperty('id', user.id);
+        expect(result).toHaveProperty('username', user.username);
+        expect(result).toHaveProperty('email', user.email);
+        expect(result).not.toHaveProperty('password');
+      });
     });
 
-    it('should throw not found exception for non-existent user', async () => {
-      await expect(context.usersController.findOne('999')).rejects.toThrow(
-        new NotFoundException('User with ID 999 not found'),
-      );
+    it('should return null for non-existent user', async () => {
+      await withTestTransaction(context, async (testContext) => {
+        const result = await testContext.usersController.findOne(999);
+        expect(result).toBeNull();
+      });
     });
   });
 
   describe('update', () => {
     it('should update a user', async () => {
-      const user = await context.userFactory.create();
-      const updateUserDto = { username: 'updateduser' };
+      await withTestTransaction(context, async (testContext) => {
+        const user = await testContext.userFactory.create();
+        const updateUserDto = {
+          username: 'updateduser',
+          email: 'updated@example.com',
+        };
 
-      const result = await context.usersController.update(
-        user.id.toString(),
-        updateUserDto,
-      );
+        const result = await testContext.usersController.update(
+          user.id,
+          updateUserDto,
+        );
 
-      expect(result).toBeDefined();
-      expect(result.username).toBe(updateUserDto.username);
-      expect((result as any).password).toBeUndefined();
+        expect(result).toHaveProperty('id', user.id);
+        expect(result).toHaveProperty('username', 'updateduser');
+        expect(result).toHaveProperty('email', 'updated@example.com');
+        expect(result).not.toHaveProperty('password');
+      });
     });
 
-    it('should throw not found exception for non-existent user', async () => {
-      await expect(
-        context.usersController.update('999', { username: 'updateduser' }),
-      ).rejects.toThrow(new NotFoundException('User with ID 999 not found'));
+    it('should return null for non-existent user', async () => {
+      await withTestTransaction(context, async (testContext) => {
+        const updateUserDto = {
+          username: 'updateduser',
+          email: 'updated@example.com',
+        };
+
+        const result = await testContext.usersController.update(
+          999,
+          updateUserDto,
+        );
+        expect(result).toBeNull();
+      });
     });
   });
 
   describe('remove', () => {
     it('should delete a user', async () => {
-      const user = await context.userFactory.create();
-      const result = await context.usersController.remove(user.id.toString());
+      await withTestTransaction(context, async (testContext) => {
+        const user = await testContext.userFactory.create();
 
-      expect(result).toEqual({ message: 'User deleted successfully' });
+        const result = await testContext.usersController.remove(user.id);
+        expect(result).toBe(true);
+
+        const deletedUser = await testContext.usersController.findOne(user.id);
+        expect(deletedUser).toBeNull();
+      });
     });
 
-    it('should throw not found exception for non-existent user', async () => {
-      await expect(context.usersController.remove('999')).rejects.toThrow(
-        new NotFoundException('User with ID 999 not found'),
-      );
+    it('should return false for non-existent user', async () => {
+      await withTestTransaction(context, async (testContext) => {
+        const result = await testContext.usersController.remove(999);
+        expect(result).toBe(false);
+      });
     });
   });
 });

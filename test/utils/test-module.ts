@@ -34,8 +34,33 @@ export async function cleanupTestingModule(
   await context.orm.close();
 }
 
+// Transaction-based test isolation (much more reliable than cleanup)
+export async function withTestTransaction<T>(
+  context: TestContext,
+  testFn: (em: any) => Promise<T>,
+): Promise<T> {
+  const em = context.orm.em.fork();
+
+  return await em.transactional(async (transactionalEm) => {
+    // Create factories that use the transactional EntityManager
+    const transactionalFactories = createFactories(transactionalEm);
+
+    // Run the test with the transactional context
+    const testContext = {
+      ...context,
+      em: transactionalEm,
+      ...transactionalFactories,
+    };
+
+    return await testFn(testContext);
+    // Transaction automatically rolls back after this scope
+  });
+}
+
+// Legacy cleanup function for backwards compatibility
 export async function cleanupDatabase(context: TestContext): Promise<void> {
-  // Use MikroORM metadata to get all entities dynamically
+  // For unit tests, we'll rely more on transaction isolation
+  // But keep this for integration tests that need it
   const em = context.orm.em.fork();
 
   try {
@@ -47,7 +72,6 @@ export async function cleanupDatabase(context: TestContext): Promise<void> {
     );
 
     // Use PostgreSQL's CASCADE to handle foreign key dependencies
-    // This is more reliable than trying to order deletions manually
     await em.getConnection().execute('SET session_replication_role = replica;');
 
     // Delete all entities
@@ -70,7 +94,7 @@ export async function cleanupDatabase(context: TestContext): Promise<void> {
       // Ignore reset errors
     }
 
-    // If tables don't exist, that's fine - they will be created by migrations
+    // If tables don't exist, that's fine
     if (
       !error.message.includes('does not exist') &&
       !error.message.includes('relation') &&

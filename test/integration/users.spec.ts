@@ -13,7 +13,8 @@ describe('UsersController (e2e)', () => {
     context = await createIntegrationTestingModule();
   });
 
-  beforeEach(async () => {
+  afterEach(async () => {
+    // Clean up after each test instead of before to prevent race conditions
     await cleanupDatabase(context);
   });
 
@@ -31,12 +32,12 @@ describe('UsersController (e2e)', () => {
 
       const response = await request(context.app.getHttpServer())
         .post('/users')
-        .send(createUserDto);
+        .send(createUserDto)
+        .expect(201);
 
-      expect(response.status).toBe(201);
       expect(response.body).toHaveProperty('id');
-      expect(response.body.username).toBe(createUserDto.username);
-      expect(response.body.email).toBe(createUserDto.email);
+      expect(response.body.username).toBe('testuser');
+      expect(response.body.email).toBe('test@example.com');
       expect(response.body).not.toHaveProperty('password');
     });
 
@@ -50,23 +51,31 @@ describe('UsersController (e2e)', () => {
       // Create first user
       await request(context.app.getHttpServer())
         .post('/users')
-        .send(createUserDto);
+        .send(createUserDto)
+        .expect(201);
 
-      // Try to create another user with same email
-      const response = await request(context.app.getHttpServer())
+      // Try to create second user with same email
+      const duplicateDto = {
+        username: 'differentuser',
+        email: 'duplicate@example.com',
+        password: 'password123',
+      };
+
+      await request(context.app.getHttpServer())
         .post('/users')
-        .send({ ...createUserDto, username: 'differentuser' });
-
-      expect(response.status).toBe(409);
+        .send(duplicateDto)
+        .expect(409);
     });
   });
 
   describe('GET /users', () => {
     it('should return all users', async () => {
-      // Create exactly 2 users for this test
-      await context.userFactory.createMany(2);
+      // Create test users first
+      const users = await context.userFactory.createMany(2);
 
-      const response = await request(context.app.getHttpServer()).get('/users');
+      const response = await request(context.app.getHttpServer())
+        .get('/users')
+        .expect(200);
 
       expect(response.status).toBe(200);
       expect(response.body).toHaveLength(2);
@@ -80,6 +89,7 @@ describe('UsersController (e2e)', () => {
   describe('GET /users/:id', () => {
     it('should return a user by id', async () => {
       const user = await context.userFactory.create();
+
       const response = await request(context.app.getHttpServer()).get(
         `/users/${user.id}`,
       );
@@ -92,11 +102,7 @@ describe('UsersController (e2e)', () => {
     });
 
     it('should return 404 for non-existent user', async () => {
-      const response = await request(context.app.getHttpServer()).get(
-        '/users/999',
-      );
-
-      expect(response.status).toBe(404);
+      await request(context.app.getHttpServer()).get('/users/999').expect(404);
     });
   });
 
@@ -120,17 +126,22 @@ describe('UsersController (e2e)', () => {
     });
 
     it('should return 404 for non-existent user', async () => {
-      const response = await request(context.app.getHttpServer())
-        .patch('/users/999')
-        .send({ username: 'updateduser' });
+      const updateUserDto = {
+        username: 'updateduser',
+        email: 'updated@example.com',
+      };
 
-      expect(response.status).toBe(404);
+      await request(context.app.getHttpServer())
+        .patch('/users/999')
+        .send(updateUserDto)
+        .expect(404);
     });
   });
 
   describe('DELETE /users/:id', () => {
     it('should delete a user', async () => {
       const user = await context.userFactory.create();
+
       const response = await request(context.app.getHttpServer()).delete(
         `/users/${user.id}`,
       );
@@ -144,11 +155,9 @@ describe('UsersController (e2e)', () => {
     });
 
     it('should return 404 for non-existent user', async () => {
-      const response = await request(context.app.getHttpServer()).delete(
-        '/users/999',
-      );
-
-      expect(response.status).toBe(404);
+      await request(context.app.getHttpServer())
+        .delete('/users/999')
+        .expect(404);
     });
   });
 });

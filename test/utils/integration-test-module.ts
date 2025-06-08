@@ -40,54 +40,32 @@ export async function cleanupIntegrationTestingModule(
   await context.orm.close();
 }
 
+// Simple and reliable cleanup for per-worker databases
 export async function cleanupDatabase(
   context: IntegrationTestContext,
 ): Promise<void> {
-  // Use MikroORM metadata to get all entities dynamically
   const em = context.orm.em.fork();
 
   try {
-    // Get all entity metadata from the ORM configuration
+    // Get all table names dynamically from metadata
     const metadata = context.orm.getMetadata();
     const allMetadata = metadata.getAll();
-    const entityNames = Object.values(allMetadata).map(
-      (meta: any) => meta.className,
+    const tableNames = Object.values(allMetadata).map(
+      (meta: any) => `"${meta.tableName}"`,
     );
 
-    // Use PostgreSQL's CASCADE to handle foreign key dependencies
-    // This is more reliable than trying to order deletions manually
-    await em.getConnection().execute('SET session_replication_role = replica;');
-
-    // Delete all entities
-    for (const entityName of entityNames) {
-      await em.nativeDelete(entityName, {});
+    if (tableNames.length > 0) {
+      // With per-worker databases, TRUNCATE CASCADE is safe and fast
+      const truncateQuery = `TRUNCATE ${tableNames.join(', ')} RESTART IDENTITY CASCADE`;
+      await em.getConnection().execute(truncateQuery);
     }
-
-    // Re-enable foreign key constraints
-    await em.getConnection().execute('SET session_replication_role = DEFAULT;');
-
-    // Flush all changes
-    await em.flush();
   } catch (error) {
-    // Re-enable foreign key constraints even if there was an error
-    try {
-      await em
-        .getConnection()
-        .execute('SET session_replication_role = DEFAULT;');
-    } catch (resetError) {
-      // Ignore reset errors
-    }
-
-    // If tables don't exist, that's fine - they will be created by migrations
-    if (
-      !error.message.includes('does not exist') &&
-      !error.message.includes('relation') &&
-      !error.message.includes('table')
-    ) {
-      console.warn('Database cleanup warning:', error.message);
-    }
+    // In per-worker setup, failures should be rare. Log and re-throw for visibility
+    console.error(`Failed to cleanup worker database:`, error.message);
+    throw error;
   }
 
-  // Clear the identity map
+  // Clear all entity manager caches
   em.clear();
+  context.orm.em.clear();
 }

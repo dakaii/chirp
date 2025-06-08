@@ -47,6 +47,7 @@
     "@types/node": "^20.11.24",
     "@types/supertest": "^6.0.2",
     "@typescript-eslint/eslint-plugin": "^7.1.1",
+    "pg": "^8.11.0",
     "@typescript-eslint/parser": "^7.1.1",
     "eslint": "^8.57.0",
     "eslint-config-prettier": "^9.1.0",
@@ -82,6 +83,9 @@
       "<rootDir>/test/"
     ],
     "globalSetup": "<rootDir>/test/global-setup.ts",
+    "setupFilesAfterEnv": [
+      "<rootDir>/test/setup-per-worker-db.ts"
+    ],
     "moduleNameMapper": {
       "^@/(.*)$": "<rootDir>/src/$1"
     },
@@ -89,7 +93,8 @@
       "ts-jest": {
         "tsconfig": "tsconfig.json"
       }
-    }
+    },
+    "maxWorkers": 4
   },
   "mikro-orm": {
     "useTsNode": true,
