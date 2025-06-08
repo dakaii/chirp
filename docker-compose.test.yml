@@ -21,13 +21,7 @@ services:
     volumes:
       - .:/usr/src/app
       - /usr/src/app/node_modules
-    command: >
-      sh -c "
-        while ! nc -z test-db 5432; do
-          echo 'Waiting for database to be ready...'
-          sleep 1
-        done
-        npx mikro-orm migration:up && npm test"
+    command: npm test
     environment:
       NODE_ENV: test
       TEST_DB_HOST: test-db
@@ -35,5 +29,6 @@ services:
       TEST_DB_USER: postgres
       TEST_DB_PASSWORD: postgres
       TEST_DB_NAME: chirp_test
+      MIKRO_ORM_CONFIG_PATH: ./test/mikro-orm.config.ts
     depends_on:
       - test-db

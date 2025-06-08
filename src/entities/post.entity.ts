@@ -17,7 +17,7 @@ export class Post {
   @Property()
   title!: string;
 
-  @Property()
+  @Property({ type: 'text' })
   content!: string;
 
   @Property()

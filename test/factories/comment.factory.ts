@@ -1,23 +1,24 @@
+import { Injectable } from '@nestjs/common';
 import { EntityManager } from '@mikro-orm/core';
 import { Comment } from '../../src/entities/comment.entity';
-import { User } from '../../src/entities/user.entity';
 import { Post } from '../../src/entities/post.entity';
+import { User } from '../../src/entities/user.entity';
 import { faker } from '@faker-js/faker';
 
+@Injectable()
 export class CommentFactory {
   constructor(private readonly em: EntityManager) {}
 
   async create(
-    user: User,
-    post: Post,
-    partial: Partial<Comment> = {},
+    partial: Partial<Comment> & { post: Post; user: User },
   ): Promise<Comment> {
+    const { post, user, ...rest } = partial;
     const comment = this.em.create(Comment, {
-      content: partial.content || faker.lorem.paragraph(),
-      user,
-      post,
+      content: rest.content || faker.lorem.paragraph(),
       createdAt: new Date(),
-      ...partial,
+      post,
+      user,
+      ...rest,
     });
 
     await this.em.persistAndFlush(comment);
@@ -25,14 +26,12 @@ export class CommentFactory {
   }
 
   async createMany(
-    user: User,
-    post: Post,
     count: number,
-    partial: Partial<Comment> = {},
+    partial: Partial<Comment> & { post: Post; user: User },
   ): Promise<Comment[]> {
     const comments: Comment[] = [];
     for (let i = 0; i < count; i++) {
-      comments.push(await this.create(user, post, partial));
+      comments.push(await this.create(partial));
     }
     return comments;
   }

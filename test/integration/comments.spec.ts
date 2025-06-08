@@ -1,62 +1,40 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication, ValidationPipe } from '@nestjs/common';
 import * as request from 'supertest';
-import { AppModule } from '../../src/app.module';
-import { MikroORM } from '@mikro-orm/core';
-import { Comment } from '../../src/entities/comment.entity';
-import { Post } from '../../src/entities/post.entity';
 import { User } from '../../src/entities/user.entity';
-import { CommentFactory } from '../factories/comment.factory';
-import { PostFactory } from '../factories/post.factory';
-import { UserFactory } from '../factories/user.factory';
-import { cleanDatabase } from '../utils/database';
+import { Post } from '../../src/entities/post.entity';
+import {
+  IntegrationTestContext,
+  createIntegrationTestModule,
+  cleanupIntegrationTestModule,
+} from '../utils/integration-test-module';
 
 describe('CommentsController (e2e)', () => {
-  let app: INestApplication;
-  let orm: MikroORM;
-  let commentFactory: CommentFactory;
-  let postFactory: PostFactory;
-  let userFactory: UserFactory;
+  let context: IntegrationTestContext;
   let testUser: User;
   let testPost: Post;
 
   beforeAll(async () => {
-    const moduleFixture: TestingModule = await Test.createTestingModule({
-      imports: [AppModule],
-    }).compile();
-
-    app = moduleFixture.createNestApplication();
-    app.useGlobalPipes(new ValidationPipe());
-    await app.init();
-
-    orm = app.get<MikroORM>(MikroORM);
-    const em = orm.em.fork();
-    commentFactory = new CommentFactory(em);
-    postFactory = new PostFactory(em);
-    userFactory = new UserFactory(em);
-
-    // Drop and recreate database schema
-    const generator = orm.getSchemaGenerator();
-    await generator.refreshDatabase();
+    context = await createIntegrationTestModule();
   });
 
   beforeEach(async () => {
-    const em = orm.em.fork();
-    await cleanDatabase(em);
+    const em = context.orm.em.fork();
+    await em.getConnection().execute(`
+      TRUNCATE TABLE "comment", "post", "user" RESTART IDENTITY CASCADE;
+    `);
+    await em.clear();
 
     // Create test user and post for each test
-    testUser = await userFactory.create();
-    testPost = await postFactory.create({ user: testUser });
+    testUser = await context.userFactory.create();
+    testPost = await context.postFactory.create({ user: testUser });
   });
 
   afterAll(async () => {
-    await orm.close();
-    await app.close();
+    await cleanupIntegrationTestModule(context);
   });
 
   describe('POST /comments', () => {
     it('should create a new comment', () => {
-      return request(app.getHttpServer())
+      return request(context.app.getHttpServer())
         .post('/comments')
         .send({
           content: 'Test Comment',
@@ -73,7 +51,7 @@ describe('CommentsController (e2e)', () => {
     });
 
     it('should return 400 for invalid data', () => {
-      return request(app.getHttpServer())
+      return request(context.app.getHttpServer())
         .post('/comments')
         .send({
           postId: testPost.id,
@@ -84,7 +62,7 @@ describe('CommentsController (e2e)', () => {
     });
 
     it('should return 404 for non-existent user', () => {
-      return request(app.getHttpServer())
+      return request(context.app.getHttpServer())
         .post('/comments')
         .send({
           content: 'Test Comment',
@@ -95,7 +73,7 @@ describe('CommentsController (e2e)', () => {
     });
 
     it('should return 404 for non-existent post', () => {
-      return request(app.getHttpServer())
+      return request(context.app.getHttpServer())
         .post('/comments')
         .send({
           content: 'Test Comment',
@@ -108,9 +86,12 @@ describe('CommentsController (e2e)', () => {
 
   describe('GET /comments/post/:postId', () => {
     it('should return comments for a specific post', async () => {
-      await commentFactory.createMany(testUser, testPost, 3);
+      await context.commentFactory.createMany(3, {
+        user: testUser,
+        post: testPost,
+      });
 
-      return request(app.getHttpServer())
+      return request(context.app.getHttpServer())
         .get(`/comments/post/${testPost.id}`)
         .expect(200)
         .expect((res) => {
@@ -123,15 +104,20 @@ describe('CommentsController (e2e)', () => {
     });
 
     it('should return 404 for non-existent post', () => {
-      return request(app.getHttpServer()).get('/comments/post/999').expect(404);
+      return request(context.app.getHttpServer())
+        .get('/comments/post/999')
+        .expect(404);
     });
   });
 
   describe('GET /comments/user/:userId', () => {
     it('should return comments for a specific user', async () => {
-      await commentFactory.createMany(testUser, testPost, 3);
+      await context.commentFactory.createMany(3, {
+        user: testUser,
+        post: testPost,
+      });
 
-      return request(app.getHttpServer())
+      return request(context.app.getHttpServer())
         .get(`/comments/user/${testUser.id}`)
         .expect(200)
         .expect((res) => {
@@ -144,15 +130,20 @@ describe('CommentsController (e2e)', () => {
     });
 
     it('should return 404 for non-existent user', () => {
-      return request(app.getHttpServer()).get('/comments/user/999').expect(404);
+      return request(context.app.getHttpServer())
+        .get('/comments/user/999')
+        .expect(404);
     });
   });
 
   describe('GET /comments/:id', () => {
     it('should return a comment by id', async () => {
-      const comment = await commentFactory.create(testUser, testPost);
+      const comment = await context.commentFactory.create({
+        user: testUser,
+        post: testPost,
+      });
 
-      return request(app.getHttpServer())
+      return request(context.app.getHttpServer())
         .get(`/comments/${comment.id}`)
         .expect(200)
         .expect((res) => {
@@ -164,15 +155,20 @@ describe('CommentsController (e2e)', () => {
     });
 
     it('should return 404 for non-existent comment', () => {
-      return request(app.getHttpServer()).get('/comments/999').expect(404);
+      return request(context.app.getHttpServer())
+        .get('/comments/999')
+        .expect(404);
     });
   });
 
   describe('PATCH /comments/:id', () => {
     it('should update a comment', async () => {
-      const comment = await commentFactory.create(testUser, testPost);
+      const comment = await context.commentFactory.create({
+        user: testUser,
+        post: testPost,
+      });
 
-      return request(app.getHttpServer())
+      return request(context.app.getHttpServer())
         .patch(`/comments/${comment.id}`)
         .send({
           content: 'Updated Comment',
@@ -185,7 +181,7 @@ describe('CommentsController (e2e)', () => {
     });
 
     it('should return 404 for non-existent comment', () => {
-      return request(app.getHttpServer())
+      return request(context.app.getHttpServer())
         .patch('/comments/999')
         .send({
           content: 'Updated Comment',
@@ -196,9 +192,12 @@ describe('CommentsController (e2e)', () => {
 
   describe('DELETE /comments/:id', () => {
     it('should delete a comment', async () => {
-      const comment = await commentFactory.create(testUser, testPost);
+      const comment = await context.commentFactory.create({
+        user: testUser,
+        post: testPost,
+      });
 
-      return request(app.getHttpServer())
+      return request(context.app.getHttpServer())
         .delete(`/comments/${comment.id}`)
         .expect(200)
         .expect((res) => {
@@ -207,7 +206,9 @@ describe('CommentsController (e2e)', () => {
     });
 
     it('should return 404 for non-existent comment', () => {
-      return request(app.getHttpServer()).delete('/comments/999').expect(404);
+      return request(context.app.getHttpServer())
+        .delete('/comments/999')
+        .expect(404);
     });
   });
 });

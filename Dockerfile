@@ -3,7 +3,13 @@ WORKDIR /usr/src/app
 COPY package*.json ./
 
 FROM base AS development
-RUN apt-get update && apt-get install -y netcat-openbsd
+# Install required build dependencies
+RUN apt-get update && apt-get install -y \
+    netcat-openbsd \
+    python3 \
+    make \
+    g++ \
+    && rm -rf /var/lib/apt/lists/*
 RUN npm install
 COPY . .
 
@@ -16,7 +22,6 @@ FROM node:20-slim AS production-run
 WORKDIR /usr/src/app
 COPY --from=production /usr/src/app/dist ./dist
 COPY --from=production /usr/src/app/node_modules ./node_modules
-CMD ["node", "dist/main"]
 
 EXPOSE 3000
 

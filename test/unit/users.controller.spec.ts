@@ -1,44 +1,23 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { UsersController } from '../../src/controllers/users.controller';
-import { UsersService } from '../../src/services/users.service';
-import { MikroOrmModule } from '@mikro-orm/nestjs';
-import { User } from '../../src/entities/user.entity';
-import { UserFactory } from '../factories/user.factory';
 import { HttpException, HttpStatus, NotFoundException } from '@nestjs/common';
-import mikroOrmConfig from '../../src/mikro-orm.config';
-import { EntityManager } from '@mikro-orm/core';
-import { SerializedUser } from '../../src/entities/user.entity';
-import { cleanDatabase } from '../utils/database';
+import {
+  TestContext,
+  createTestingModule,
+  cleanupTestingModule,
+} from '../utils/test-module';
 
 describe('UsersController', () => {
-  let controller: UsersController;
-  let userFactory: UserFactory;
-  let em: EntityManager;
+  let context: TestContext;
 
   beforeEach(async () => {
-    process.env.NODE_ENV = 'test';
-    const module: TestingModule = await Test.createTestingModule({
-      imports: [
-        MikroOrmModule.forRoot(mikroOrmConfig),
-        MikroOrmModule.forFeature([User]),
-      ],
-      controllers: [UsersController],
-      providers: [UsersService, UserFactory],
-    }).compile();
-
-    controller = module.get<UsersController>(UsersController);
-    userFactory = module.get<UserFactory>(UserFactory);
-    em = module.get<EntityManager>(EntityManager);
-
-    await cleanDatabase(em);
+    context = await createTestingModule();
   });
 
   afterEach(async () => {
-    await cleanDatabase(em);
+    await cleanupTestingModule(context);
   });
 
   it('should be defined', () => {
-    expect(controller).toBeDefined();
+    expect(context.usersController).toBeDefined();
   });
 
   describe('create', () => {
@@ -49,7 +28,7 @@ describe('UsersController', () => {
         password: 'password123',
       };
 
-      const result = await controller.create(createUserDto);
+      const result = await context.usersController.create(createUserDto);
       expect(result).toBeDefined();
       expect(result.username).toBe(createUserDto.username);
       expect(result.email).toBe(createUserDto.email);
@@ -64,11 +43,11 @@ describe('UsersController', () => {
       };
 
       // First creation should succeed
-      await controller.create(createUserDto);
+      await context.usersController.create(createUserDto);
 
       // Second creation with same email should fail
       await expect(
-        controller.create({
+        context.usersController.create({
           ...createUserDto,
           username: 'differentuser', // Different username but same email
         }),
@@ -83,16 +62,10 @@ describe('UsersController', () => {
 
   describe('findAll', () => {
     it('should return an array of users', async () => {
-      // Clear any existing users
-      await em.getConnection().execute(`
-        TRUNCATE TABLE "comment", "post", "user" RESTART IDENTITY CASCADE;
-      `);
-      await em.clear();
-
       // Create exactly 3 users
-      const users = await userFactory.createMany(3);
+      const users = await context.userFactory.createMany(3);
 
-      const result = await controller.findAll();
+      const result = await context.usersController.findAll();
 
       expect(result).toHaveLength(users.length);
       expect((result[0] as any).password).toBeUndefined();
@@ -101,8 +74,8 @@ describe('UsersController', () => {
 
   describe('findOne', () => {
     it('should return a user by id', async () => {
-      const user = await userFactory.create();
-      const result = await controller.findOne(user.id.toString());
+      const user = await context.userFactory.create();
+      const result = await context.usersController.findOne(user.id.toString());
 
       expect(result).toBeDefined();
       expect(result.id).toBe(user.id);
@@ -110,7 +83,7 @@ describe('UsersController', () => {
     });
 
     it('should throw not found exception for non-existent user', async () => {
-      await expect(controller.findOne('999')).rejects.toThrow(
+      await expect(context.usersController.findOne('999')).rejects.toThrow(
         new NotFoundException('User with ID 999 not found'),
       );
     });
@@ -118,10 +91,13 @@ describe('UsersController', () => {
 
   describe('update', () => {
     it('should update a user', async () => {
-      const user = await userFactory.create();
+      const user = await context.userFactory.create();
       const updateUserDto = { username: 'updateduser' };
 
-      const result = await controller.update(user.id.toString(), updateUserDto);
+      const result = await context.usersController.update(
+        user.id.toString(),
+        updateUserDto,
+      );
 
       expect(result).toBeDefined();
       expect(result.username).toBe(updateUserDto.username);
@@ -130,21 +106,21 @@ describe('UsersController', () => {
 
     it('should throw not found exception for non-existent user', async () => {
       await expect(
-        controller.update('999', { username: 'updateduser' }),
+        context.usersController.update('999', { username: 'updateduser' }),
       ).rejects.toThrow(new NotFoundException('User with ID 999 not found'));
     });
   });
 
   describe('remove', () => {
     it('should delete a user', async () => {
-      const user = await userFactory.create();
-      const result = await controller.remove(user.id.toString());
+      const user = await context.userFactory.create();
+      const result = await context.usersController.remove(user.id.toString());
 
       expect(result).toEqual({ message: 'User deleted successfully' });
     });
 
     it('should throw not found exception for non-existent user', async () => {
-      await expect(controller.remove('999')).rejects.toThrow(
+      await expect(context.usersController.remove('999')).rejects.toThrow(
         new NotFoundException('User with ID 999 not found'),
       );
     });

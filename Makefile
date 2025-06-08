@@ -1,4 +1,4 @@
-.PHONY: migration-create migration-up migration-down test test-e2e build start test-clean test-build
+.PHONY: migration-create migration-up migration-down test test-e2e build start test-clean test-build test-migrations
 
 # Development
 up:
@@ -14,8 +14,14 @@ test-clean:
 test-build:
 	docker compose -f docker-compose.test.yml build
 
-test: test-clean
-	docker compose -f docker-compose.test.yml up --abort-on-container-exit
+test-migrations:
+	docker compose -f docker-compose.test.yml up -d test-db test-app
+	@echo "Waiting for database to be ready..."
+	@sleep 3
+	docker compose -f docker-compose.test.yml exec -T test-app npx mikro-orm migration:up
+
+test:
+	docker compose -f docker-compose.test.yml up --abort-on-container-exit --exit-code-from test-app && docker-compose.test.yml down -v
 
 test-rebuild: test-clean test-build test
 

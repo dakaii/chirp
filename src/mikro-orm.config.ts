@@ -1,33 +1,26 @@
 import { Options } from '@mikro-orm/core';
-import { User } from './entities/user.entity';
-import { Post } from './entities/post.entity';
-import { Comment } from './entities/comment.entity';
+import { TsMorphMetadataProvider } from '@mikro-orm/reflection';
 
 const config: Options = {
-  entities: [User, Post, Comment],
+  metadataProvider: TsMorphMetadataProvider,
+  entities:
+    process.env.NODE_ENV === 'production'
+      ? ['./dist/entities/*.entity.js']
+      : ['./src/entities/*.entity.ts'],
   type: 'postgresql',
-  dbName:
-    process.env.NODE_ENV === 'test'
-      ? process.env.TEST_DB_NAME || 'chirp_test'
-      : process.env.DB_NAME || 'chirp_db',
-  host:
-    process.env.NODE_ENV === 'test'
-      ? process.env.TEST_DB_HOST || 'localhost'
-      : process.env.DB_HOST || 'localhost',
-  port:
-    process.env.NODE_ENV === 'test'
-      ? +(process.env.TEST_DB_PORT || 5432)
-      : +(process.env.DB_PORT || 5432),
-  user:
-    process.env.NODE_ENV === 'test'
-      ? process.env.TEST_DB_USER || 'postgres'
-      : process.env.DB_USER || 'postgres',
-  password:
-    process.env.NODE_ENV === 'test'
-      ? process.env.TEST_DB_PASSWORD || 'postgres'
-      : process.env.DB_PASSWORD || 'postgres',
+  dbName: process.env.DB_NAME || 'chirp',
+  host: process.env.DB_HOST || 'db',
+  port: +(process.env.DB_PORT || 5432),
+  user: process.env.DB_USER || 'postgres',
+  password: process.env.DB_PASSWORD || 'postgres',
   debug: process.env.NODE_ENV === 'development',
-  allowGlobalContext: process.env.NODE_ENV === 'test',
+  migrations: {
+    path: './migrations',
+    glob: '!(*.d).{js,ts}',
+    transactional: true,
+    allOrNothing: true,
+    snapshot: false,
+  },
 };
 
 export default config;
