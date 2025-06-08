@@ -1,121 +1,75 @@
 /**
- * Test Setup (runs before each test file)
+ * Main Test Setup (runs before each test file)
  *
  * This file runs before each test file is executed.
- * It provides additional setup that complements the global setup.
+ * It provides the basic setup that works for all tests.
+ *
+ * For parallel testing, see test/parallel/ directory.
  */
 
 import { MikroORM } from '@mikro-orm/core';
-import {
-  getTestWorkerId,
-  isParallelTestMode,
-  getTestWorkerEnv,
-  logWorkerConfig,
-} from './utils/test-config';
 import mikroOrmConfig from './mikro-orm.config';
 
 // Increase timeout for database operations
 jest.setTimeout(30000);
 
-// Setup console logging with worker context in parallel mode
-if (isParallelTestMode()) {
-  const workerId = getTestWorkerId();
-  const originalLog = console.log;
-  const originalError = console.error;
-  const originalWarn = console.warn;
-
-  console.log = (...args) => originalLog(`[Worker ${workerId}]`, ...args);
-  console.error = (...args) => originalError(`[Worker ${workerId}]`, ...args);
-  console.warn = (...args) => originalWarn(`[Worker ${workerId}]`, ...args);
-}
-
-// Database setup function
+// Simple database setup function for main tests
 async function setupDatabase() {
-  const workerId = getTestWorkerId();
-  console.log(`🚀 Setting up database for worker ${workerId}...`);
-
-  // Get worker-specific environment variables
-  const testEnv = getTestWorkerEnv();
-
-  // Log configuration in debug mode
-  if (process.env.DEBUG_TESTS === 'true') {
-    logWorkerConfig();
-  }
+  console.log('🚀 Setting up test database...');
 
   try {
-    // Create connection to PostgreSQL server (not specific database)
-    const serverConfig = {
-      ...mikroOrmConfig,
-      dbName: 'postgres', // Connect to default postgres database first
-    };
-
-    const orm = await MikroORM.init(serverConfig);
-
-    // Create the test database if it doesn't exist
-    const connection = orm.em.getConnection();
-
-    console.log(`📦 Creating database: ${testEnv.TEST_DB_NAME}`);
-
-    try {
-      await connection.execute(`CREATE DATABASE "${testEnv.TEST_DB_NAME}"`);
-      console.log(`✅ Database created: ${testEnv.TEST_DB_NAME}`);
-    } catch (error: any) {
-      if (error.code === '42P04') {
-        console.log(`📦 Database ${testEnv.TEST_DB_NAME} already exists`);
-      } else {
-        throw error;
-      }
-    }
-
-    await orm.close();
-
-    // Now connect to the test database and set up schema
+    // Connect to the default test database
     const testOrmConfig = {
       ...mikroOrmConfig,
-      dbName: testEnv.TEST_DB_NAME,
+      dbName: process.env.TEST_DB_NAME || 'chirp_test',
     };
 
     const testOrm = await MikroORM.init(testOrmConfig);
 
-    console.log(`🗃️ Initializing database schema for worker ${workerId}...`);
+    console.log('🗃️ Initializing database schema...');
 
     // Generate schema
     const generator = testOrm.getSchemaGenerator();
     await generator.dropSchema();
     await generator.createSchema();
 
-    console.log(`✅ Database schema initialized for worker ${workerId}`);
+    console.log('✅ Database schema initialized');
 
     await testOrm.close();
 
-    console.log(`✅ Database setup completed for worker ${workerId}`);
+    console.log('✅ Database setup completed');
   } catch (error) {
-    console.error(`❌ Database setup failed for worker ${workerId}:`, error);
+    console.error('❌ Database setup failed:', error);
     throw error;
   }
 }
 
-// Run database setup once per worker
+// Check if we're in parallel mode and use appropriate setup
 let setupComplete = false;
 
 beforeAll(async () => {
   if (!setupComplete) {
-    await setupDatabase();
+    if (process.env.TEST_PARALLEL === 'true') {
+      // Use parallel setup
+      const { setupParallelDatabase } = await import(
+        './parallel/parallel-setup'
+      );
+      await setupParallelDatabase();
+    } else {
+      // Use simple sequential setup
+      await setupDatabase();
+    }
     setupComplete = true;
   }
 });
 
 // Global error handler for unhandled promise rejections
 process.on('unhandledRejection', (reason, promise) => {
-  const workerId = getTestWorkerId();
-  console.error(`[Worker ${workerId}] Unhandled promise rejection:`, reason);
+  console.error('Unhandled promise rejection:', reason);
 });
 
 // Ensure clean exit
 process.on('SIGTERM', () => {
-  const workerId = getTestWorkerId();
-  console.log(
-    `[Worker ${workerId}] Received SIGTERM, shutting down gracefully`,
-  );
+  console.log('Received SIGTERM, shutting down gracefully');
   process.exit(0);
 });

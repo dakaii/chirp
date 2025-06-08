@@ -7,6 +7,15 @@ export class PostFactory {
   constructor(private readonly em: EntityManager) {}
 
   async create(data: Partial<Post> & { user?: User } = {}): Promise<Post> {
+    // Use parallel factory in parallel test mode
+    if (process.env.TEST_PARALLEL === 'true') {
+      const { ParallelPostFactory } = await import(
+        '../parallel/factories/post.factory'
+      );
+      const parallelFactory = new ParallelPostFactory(this.em);
+      return parallelFactory.create(data);
+    }
+
     const { user, ...rest } = data;
 
     // Get or create user
@@ -36,9 +45,19 @@ export class PostFactory {
     count: number,
     data: Partial<Post> & { user?: User } = {},
   ): Promise<Post[]> {
-    const { user, ...rest } = data;
+    // Use parallel factory in parallel test mode
+    if (process.env.TEST_PARALLEL === 'true') {
+      const { ParallelPostFactory } = await import(
+        '../parallel/factories/post.factory'
+      );
+      const parallelFactory = new ParallelPostFactory(this.em);
+      return parallelFactory.createMany(count, data);
+    }
 
-    // Get or create user once for all posts
+    const { user, ...rest } = data;
+    const posts: Post[] = [];
+
+    // Create a user for all posts if none provided
     let targetUser = user;
     if (!targetUser) {
       targetUser = this.em.create(User, {
@@ -49,11 +68,10 @@ export class PostFactory {
       await this.em.persistAndFlush(targetUser);
     }
 
-    const posts: Post[] = [];
     for (let i = 0; i < count; i++) {
       const post = this.em.create(Post, {
-        title: faker.lorem.sentence(),
-        content: faker.lorem.paragraphs(3),
+        title: `${faker.lorem.sentence()} ${i}`,
+        content: faker.lorem.paragraphs(2),
         createdAt: new Date(),
         user: targetUser,
         ...rest,
