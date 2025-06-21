@@ -1,13 +1,11 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication } from '@nestjs/common';
 import * as request from 'supertest';
-import { User } from '../../src/entities/user.entity';
 import { Post } from '../../src/entities/post.entity';
+import { User } from '../../src/entities/user.entity';
 import {
   IntegrationTestContext,
-  createIntegrationTestingModule,
-  cleanupIntegrationTestingModule,
   cleanupDatabase,
+  cleanupIntegrationTestingModule,
+  createIntegrationTestingModule,
 } from '../utils/integration-test-module';
 
 describe('CommentsController (e2e)', () => {
@@ -21,8 +19,13 @@ describe('CommentsController (e2e)', () => {
 
   beforeEach(async () => {
     await cleanupDatabase(context);
-    testUser = await context.data.userFactory.create();
-    testPost = await context.data.postFactory.create({ user: testUser });
+    testUser = await context.data.userFactory.createOne();
+    const [post] = await context.data.postFactory
+      .each((post) => {
+        post.user = testUser;
+      })
+      .create(1);
+    testPost = post;
   });
 
   afterAll(async () => {
@@ -73,10 +76,12 @@ describe('CommentsController (e2e)', () => {
 
   describe('GET /posts/:id/comments', () => {
     it('should return all comments for a post', async () => {
-      await context.data.commentFactory.createMany(2, {
-        user: testUser,
-        post: testPost,
-      });
+      await context.data.commentFactory
+        .each((comment) => {
+          comment.user = testUser;
+          comment.post = testPost;
+        })
+        .create(2);
 
       const response = await request(context.app.getHttpServer()).get(
         `/posts/${testPost.id}/comments`,
@@ -110,10 +115,12 @@ describe('CommentsController (e2e)', () => {
 
   describe('GET /users/:id/comments', () => {
     it('should return all comments by a user', async () => {
-      await context.data.commentFactory.createMany(2, {
-        user: testUser,
-        post: testPost,
-      });
+      await context.data.commentFactory
+        .each((comment) => {
+          comment.user = testUser;
+          comment.post = testPost;
+        })
+        .create(2);
 
       const response = await request(context.app.getHttpServer()).get(
         `/users/${testUser.id}/comments`,
@@ -147,10 +154,12 @@ describe('CommentsController (e2e)', () => {
 
   describe('PATCH /comments/:id', () => {
     it('should update a comment', async () => {
-      const comment = await context.data.commentFactory.create({
-        user: testUser,
-        post: testPost,
-      });
+      const [comment] = await context.data.commentFactory
+        .each((comment) => {
+          comment.user = testUser;
+          comment.post = testPost;
+        })
+        .create(1);
 
       const response = await request(context.app.getHttpServer())
         .patch(`/comments/${comment.id}`)
@@ -181,10 +190,12 @@ describe('CommentsController (e2e)', () => {
 
   describe('DELETE /comments/:id', () => {
     it('should delete a comment', async () => {
-      const comment = await context.data.commentFactory.create({
-        user: testUser,
-        post: testPost,
-      });
+      const [comment] = await context.data.commentFactory
+        .each((comment) => {
+          comment.user = testUser;
+          comment.post = testPost;
+        })
+        .create(1);
 
       const response = await request(context.app.getHttpServer()).delete(
         `/comments/${comment.id}`,

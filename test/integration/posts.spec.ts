@@ -1,9 +1,9 @@
 import * as request from 'supertest';
 import {
   IntegrationTestContext,
-  createIntegrationTestingModule,
-  cleanupIntegrationTestingModule,
   cleanupDatabase,
+  cleanupIntegrationTestingModule,
+  createIntegrationTestingModule,
 } from '../utils/integration-test-module';
 
 describe('PostsController (e2e)', () => {
@@ -23,7 +23,7 @@ describe('PostsController (e2e)', () => {
 
   describe('POST /posts', () => {
     it('should create a new post', async () => {
-      const user = await context.data.userFactory.create();
+      const user = await context.data.userFactory.createOne();
 
       const createPostDto = {
         title: 'Test Post',
@@ -45,11 +45,12 @@ describe('PostsController (e2e)', () => {
 
   describe('GET /posts', () => {
     it('should return all posts', async () => {
-      const user = await context.data.userFactory.create();
-      const posts = await Promise.all([
-        context.data.postFactory.create({ title: 'Post 1', user }),
-        context.data.postFactory.create({ title: 'Post 2', user }),
-      ]);
+      const user = await context.data.userFactory.createOne();
+      await context.data.postFactory
+        .each((post) => {
+          post.user = user;
+        })
+        .create(2);
 
       const response = await request(context.app.getHttpServer())
         .get('/posts')
@@ -64,8 +65,12 @@ describe('PostsController (e2e)', () => {
 
   describe('GET /posts/:id', () => {
     it('should return a post by id', async () => {
-      const user = await context.data.userFactory.create();
-      const post = await context.data.postFactory.create({ user });
+      const user = await context.data.userFactory.createOne();
+      const [post] = await context.data.postFactory
+        .each((post) => {
+          post.user = user;
+        })
+        .create(1);
 
       const response = await request(context.app.getHttpServer())
         .get(`/posts/${post.id}`)
@@ -83,8 +88,12 @@ describe('PostsController (e2e)', () => {
 
   describe('PATCH /posts/:id', () => {
     it('should update a post', async () => {
-      const user = await context.data.userFactory.create();
-      const post = await context.data.postFactory.create({ user });
+      const user = await context.data.userFactory.createOne();
+      const [post] = await context.data.postFactory
+        .each((post) => {
+          post.user = user;
+        })
+        .create(1);
       const updatePostDto = {
         title: 'Updated Post',
         content: 'This is updated content',
@@ -106,8 +115,12 @@ describe('PostsController (e2e)', () => {
 
   describe('DELETE /posts/:id', () => {
     it('should delete a post', async () => {
-      const user = await context.data.userFactory.create();
-      const post = await context.data.postFactory.create({ user });
+      const user = await context.data.userFactory.createOne();
+      const [post] = await context.data.postFactory
+        .each((post) => {
+          post.user = user;
+        })
+        .create(1);
 
       await request(context.app.getHttpServer())
         .delete(`/posts/${post.id}`)
@@ -121,8 +134,12 @@ describe('PostsController (e2e)', () => {
 
   describe('GET /posts/user/:userId', () => {
     it('should return posts by user', async () => {
-      const user = await context.data.userFactory.create();
-      const posts = await context.data.postFactory.createMany(3, { user });
+      const user = await context.data.userFactory.createOne();
+      await context.data.postFactory
+        .each((post) => {
+          post.user = user;
+        })
+        .create(3);
 
       const response = await request(context.app.getHttpServer())
         .get(`/posts/user/${user.id}`)

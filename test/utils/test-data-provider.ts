@@ -2,7 +2,7 @@
  * Test Data Provider - Provides Factories to Tests
  *
  * Simple provider that gives access to factories for creating test data.
- * Each test creates exactly what it needs using factories.
+ * Uses mikro-orm/seeder factories for cleaner and more standardized approach.
  */
 
 import { EntityManager } from '@mikro-orm/core';
@@ -11,7 +11,6 @@ import { PostFactory } from '../factories/post.factory';
 import { CommentFactory } from '../factories/comment.factory';
 
 export class TestDataProvider {
-  // Expose factories directly - no wrappers needed
   readonly userFactory: UserFactory;
   readonly postFactory: PostFactory;
   readonly commentFactory: CommentFactory;

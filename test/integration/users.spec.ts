@@ -1,9 +1,9 @@
 import * as request from 'supertest';
 import {
   IntegrationTestContext,
-  createIntegrationTestingModule,
-  cleanupIntegrationTestingModule,
   cleanupDatabase,
+  cleanupIntegrationTestingModule,
+  createIntegrationTestingModule,
 } from '../utils/integration-test-module';
 
 describe('UsersController (e2e)', () => {
@@ -86,15 +86,15 @@ describe('UsersController (e2e)', () => {
   describe('GET /users', () => {
     it('should return all users', async () => {
       // Create users as needed instead of relying on seeded ones
-      await context.data.userFactory.create({
+      await context.data.userFactory.createOne({
         username: 'user1',
         email: 'user1@test.com',
       });
-      await context.data.userFactory.create({
+      await context.data.userFactory.createOne({
         username: 'user2',
         email: 'user2@test.com',
       });
-      await context.data.userFactory.create({
+      await context.data.userFactory.createOne({
         username: 'user3',
         email: 'user3@test.com',
       });
@@ -116,7 +116,7 @@ describe('UsersController (e2e)', () => {
   describe('GET /users/:id', () => {
     it('should return a user by id', async () => {
       // Create user as needed instead of using seeded user
-      const user = await context.data.userFactory.create();
+      const user = await context.data.userFactory.createOne();
 
       const response = await request(context.app.getHttpServer()).get(
         `/users/${user.id}`,
@@ -137,7 +137,7 @@ describe('UsersController (e2e)', () => {
   describe('PATCH /users/:id', () => {
     it('should update a user', async () => {
       // Create user as needed
-      const user = await context.data.userFactory.create();
+      const user = await context.data.userFactory.createOne();
       const updateUserDto = {
         username: 'updateduser',
         email: 'updated@example.com',
@@ -170,7 +170,7 @@ describe('UsersController (e2e)', () => {
   describe('DELETE /users/:id', () => {
     it('should delete a user', async () => {
       // Create user as needed
-      const user = await context.data.userFactory.create();
+      const user = await context.data.userFactory.createOne();
 
       const response = await request(context.app.getHttpServer()).delete(
         `/users/${user.id}`,
